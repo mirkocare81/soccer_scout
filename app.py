@@ -440,7 +440,7 @@ if menu == "📋 Setup Partite & Formazioni":
                 st.rerun()
 
 # =====================================================================
-# 2. INSERIMENTO PARAMETRI & VOTI (SALVATAGGIO ISOLATO PER PARTITA)
+# 2. INSERIMENTO PARAMETRI & VOTI
 # =====================================================================
 elif menu == "⚡ Inserimento Parametri & Voti":
     st.title("⚡ Inserimento Parametri Post-Partita & Voti")
@@ -713,22 +713,66 @@ elif menu == "📈 Riepilogo Squadra":
     giocatore_sel = st.selectbox("Seleziona Giocatore", list(db_giocatori.keys()) if db_giocatori else ["Nessun Giocatore"])
     
     storico_voti = []
+    tot_minuti = 0
+    presenze_titolare = 0
+    presenze_subentro = 0
+
     for p_nome, p_val in db_partite.items():
         formazione = p_val.get("formazione", {})
         for n, nome in formazione.items():
             if nome == giocatore_sel:
-                is_portiere = (str(n) in ["1", "12"])
                 d_p = p_val.get("dati_prestazione", {}).get(giocatore_sel, {})
                 if d_p:
-                    storico_voti.append(calcola_voto(d_p, is_portiere))
+                    min_giocati = int(d_p.get("minuti", 0))
+                    num_maglia = int(n) if str(n).isdigit() else 0
 
+                    # Controllo se ha giocato almeno 1 minuto
+                    if min_giocati > 0:
+                        is_portiere = (str(n) in ["1", "12"])
+                        storico_voti.append(calcola_voto(d_p, is_portiere))
+                        tot_minuti += min_giocati
+
+                        if 1 <= num_maglia <= 11:
+                            presenze_titolare += 1
+                        elif 12 <= num_maglia <= 20:
+                            presenze_subentro += 1
+
+    tot_presenze = presenze_titolare + presenze_subentro
     media_stagione = round(sum(storico_voti)/len(storico_voti), 1) if storico_voti else 6.0
     trend = calcola_trend_giocatore(storico_voti)
 
+    # Metriche generali
     c1, c2, c3 = st.columns(3)
-    c1.metric("Partite Giocate", len(storico_voti))
+    c1.metric("Partite Votate", len(storico_voti))
     c2.metric("Media Voto Stagionale", f"{media_stagione} / 10")
     c3.metric("Trend di Rendimento", trend)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # Box dettagliato presenze e minuti
+    st.markdown(f"""
+    <div style="background-color: {tema['bg_card']}; border: 1px solid {tema['border_color']}; border-radius: {tema['border_radius']}px; padding: 20px; box-shadow: 0 6px 14px rgba(0,0,0,{ombra_alfa});">
+        <h4 style="margin-top: 0; color: {tema['accent']}; border-bottom: 1px solid {tema['border_color']}; padding-bottom: 10px;">📋 Dettaglio Presenze & Minutaggio: {giocatore_sel}</h4>
+        <div style="display: flex; justify-content: space-around; text-align: center; margin-top: 15px;">
+            <div>
+                <span style="font-size: 13px; color: #a0aec0; display: block;">PRESENZE TOTALI</span>
+                <span style="font-size: 24px; font-weight: bold; color: {tema['text_color']};">{tot_presenze}</span>
+            </div>
+            <div>
+                <span style="font-size: 13px; color: #a0aec0; display: block;">DA TITOLARE (1-11)</span>
+                <span style="font-size: 24px; font-weight: bold; color: {tema['accent']};">{presenze_titolare}</span>
+            </div>
+            <div>
+                <span style="font-size: 13px; color: #a0aec0; display: block;">SUBENTRI (12-20)</span>
+                <span style="font-size: 24px; font-weight: bold; color: #3b82f6;">{presenze_subentro}</span>
+            </div>
+            <div>
+                <span style="font-size: 13px; color: #a0aec0; display: block;">MINUTI GIOCATI</span>
+                <span style="font-size: 24px; font-weight: bold; color: {tema['accent']};">{tot_minuti}'</span>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 # =====================================================================
 # 5. GESTIONE ROSA
