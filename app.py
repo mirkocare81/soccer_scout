@@ -574,7 +574,7 @@ elif menu == "🎥 Video Analisi":
         st.info("💡 **Istruzioni:** Incolla il link del video di YouTube (intero match o clip di analisi) e clicca su **Play Video** per caricarlo nel player a destra.")
 
     with col_video_r:
-        st.subheader("📺 Main Frame Video")
+        st.subheader("📺 Analisi video")
         link_corrente = p_info.get("youtube_link", "")
         yt_id = estrai_youtube_id(link_corrente)
 
