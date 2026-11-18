@@ -120,7 +120,7 @@ tema = st.session_state["ui_theme"]
 is_fullscreen = st.session_state["fullscreen_mode"]
 
 # =====================================================================
-# APPLICAZIONE CSS & UI (BOX SCURI, PULSANTI HOVER ROSSO E EXPANDER ICONE)
+# APPLICAZIONE CSS & UI
 # =====================================================================
 ombra_alfa = tema["shadow_intensity"] / 100.0
 fullscreen_css = "[data-testid=\"stSidebar\"] {display: none !important;} header {visibility: hidden !important;}" if is_fullscreen else ""
@@ -132,14 +132,12 @@ st.markdown(f"""
     h1, h2, h3, h4, h5, h6, p, label, .stMarkdown, span {{ color: {tema['text_color']} !important; }}
     [data-testid="stSidebar"] {{ background-color: {tema['bg_sidebar']}; border-right: 1px solid {tema['border_color']}; }}
     
-    /* Box metriche e info box scuri e leggibili */
     [data-testid="stMetric"], div[data-baseweb="notification"], .stAlert {{
         background-color: {tema['bg_card']} !important; border: 1px solid {tema['border_color']} !important;
         color: {tema['text_color']} !important; padding: 18px; border-radius: {tema['border_radius']}px; box-shadow: 0 6px 14px rgba(0,0,0,{ombra_alfa});
     }}
     [data-testid="stMetricValue"] {{ color: {tema['accent']} !important; }}
 
-    /* Pulsanti generali scuri con hover rosso */
     .stButton > button, .stDownloadButton > button {{
         background-color: #1a1d29 !important; color: #ffffff !important;
         border-radius: {tema['border_radius']}px !important; border: 1px solid {tema['border_color']} !important; font-weight: 600 !important;
@@ -149,7 +147,6 @@ st.markdown(f"""
         background-color: #ef4444 !important; border-color: #ef4444 !important; color: #ffffff !important;
     }}
 
-    /* Stile compatto per gli expander icona (+ e -) nella riga setup */
     [data-testid="stExpander"] {{
         background-color: {tema['bg_card']} !important;
         border: 1px solid {tema['border_color']} !important;
@@ -167,7 +164,6 @@ st.markdown(f"""
         width: 100% !important;
     }}
 
-    /* Campi di input e select scuri */
     input, textarea, select, div[data-baseweb="input"] div, div[data-baseweb="select"] div {{
         background-color: {tema['bg_card']} !important; color: {tema['text_color']} !important;
         border-color: {tema['border_color']} !important; border-radius: {max(4, tema['border_radius']-4)}px !important;
@@ -297,7 +293,7 @@ if time.time() - st.session_state["last_auto_save"] > 30:
 menu = st.sidebar.radio("Navigazione", ["📋 Setup Partite & Formazioni", "⚡ Inserimento Parametri & Voti", "📈 Riepilogo Squadra", "👤 Gestione Rosa", "🎨 Editor Grafica"])
 
 # =====================================================================
-# 1. SETUP PARTITE & FORMAZIONI (CON PULSANTI + e - COMPATTI)
+# 1. SETUP PARTITE & FORMAZIONI
 # =====================================================================
 if menu == "📋 Setup Partite & Formazioni":
     st.title("📋 Setup Partite & Formazioni Titolari / Riserve")
@@ -393,7 +389,7 @@ if menu == "📋 Setup Partite & Formazioni":
                 st.rerun()
 
 # =====================================================================
-# 2. INSERIMENTO PARAMETRI & VOTI
+# 2. INSERIMENTO PARAMETRI & VOTI (CON BOX VOTO IN TEMPO REALE A DESTRA)
 # =====================================================================
 elif menu == "⚡ Inserimento Parametri & Voti":
     st.title("⚡ Inserimento Parametri Post-Partita & Voti")
@@ -411,6 +407,8 @@ elif menu == "⚡ Inserimento Parametri & Voti":
         p_dati["dati_prestazione"] = {}
 
     with st.form("form_inserimento_parametri"):
+        passaggi_opt = [100, 75, 50, 25, 10]
+        
         st.markdown("### 🔴 TITOLARI (Maglie 1 - 11)")
         for i in range(1, 12):
             nome_g = p_dati["formazione"].get(str(i), p_dati["formazione"].get(i, ""))
@@ -421,22 +419,29 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 "minuti": 80, "duelli": "5/5", "passaggi": 75, "perse": 0, "tiri": "0/0", "salvataggi": 0
             })
             
-            c1, c2, c3, c4, c5 = st.columns(5)
+            # Layout: 5 colonne per i parametri + 1 colonna a destra per il Voto in tempo reale
+            c1, c2, c3, c4, c5, c_voto = st.columns([1.2, 1.2, 1.2, 1, 1.2, 1])
             with c1:
                 minuti = st.number_input(f"Minuti ({nome_g})", 1, 80, int(current_vals.get("minuti", 80)), key=f"min_{i}")
             with c2:
-                duelli = st.text_input(f"Duelli Vinti/Tot ({nome_g})", str(current_vals.get("duelli", "5/5")), key=f"due_{i}")
+                duelli = st.text_input(f"Duelli V/T ({nome_g})", str(current_vals.get("duelli", "5/5")), key=f"due_{i}")
             with c3:
-                passaggi_opt = [100, 75, 50, 25, 10]
                 val_pass = int(current_vals.get("passaggi", 75))
                 idx_pass = passaggi_opt.index(val_pass) if val_pass in passaggi_opt else 1
-                passaggi = st.selectbox(f"Passaggi ({nome_g})", passaggi_opt, index=idx_pass, key=f"pas_{i}")
+                passaggi = st.selectbox(f"Passaggi % ({nome_g})", passaggi_opt, index=idx_pass, key=f"pas_{i}")
             with c4:
-                perse = st.number_input(f"Palle Perse ({nome_g})", 0, 10, int(current_vals.get("perse", 0)), key=f"per_{i}")
+                perse = st.number_input(f"Perse ({nome_g})", 0, 10, int(current_vals.get("perse", 0)), key=f"per_{i}")
             with c5:
                 tiri = st.text_input(f"Tiri P/Sp ({nome_g})", str(current_vals.get("tiri", "0/0")), key=f"tir_{i}")
             
-            p_dati["dati_prestazione"][nome_g] = {"minuti": minuti, "duelli": duelli, "passaggi": passaggi, "perse": perse, "tiri": tiri, "salvataggi": 0}
+            # Calcolo istantaneo del voto con i valori correnti del form
+            temp_dict = {"minuti": minuti, "duelli": duelli, "passaggi": passaggi, "perse": perse, "tiri": tiri, "salvataggi": 0}
+            voto_live = calcola_voto(temp_dict)
+            
+            with c_voto:
+                st.markdown(f"<div style='background-color: #1e2230; border: 1px solid {tema['accent']}; padding: 8px; border-radius: 8px; text-align: center; margin-top: 24px;'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {tema['accent']};'>{voto_live}</span></div>", unsafe_allow_html=True)
+
+            p_dati["dati_prestazione"][nome_g] = temp_dict
             st.markdown("---")
 
         st.markdown("<br><hr style='border: 2px dashed #10b981;'><br>", unsafe_allow_html=True)
@@ -451,21 +456,28 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 "minuti": 0, "duelli": "0/0", "passaggi": 75, "perse": 0, "tiri": "0/0", "salvataggi": 0
             })
             
-            c1, c2, c3, c4, c5 = st.columns(5)
+            c1, c2, c3, c4, c5, c_voto = st.columns([1.2, 1.2, 1.2, 1, 1.2, 1])
             with c1:
-                minuti = st.number_input(f"Minuti subentrato ({nome_g})", 0, 80, int(current_vals.get("minuti", 0)), key=f"min_res_{i}")
+                minuti = st.number_input(f"Min sub ({nome_g})", 0, 80, int(current_vals.get("minuti", 0)), key=f"min_res_{i}")
             with c2:
-                duelli = st.text_input(f"Duelli Vinti/Tot ({nome_g})", str(current_vals.get("duelli", "0/0")), key=f"due_res_{i}")
+                duelli = st.text_input(f"Duelli V/T ({nome_g})", str(current_vals.get("duelli", "0/0")), key=f"due_res_{i}")
             with c3:
                 val_pass_res = int(current_vals.get("passaggi", 75))
                 idx_pass_res = passaggi_opt.index(val_pass_res) if val_pass_res in passaggi_opt else 1
-                passaggi = st.selectbox(f"Passaggi ({nome_g})", passaggi_opt, index=idx_pass_res, key=f"pas_res_{i}")
+                passaggi = st.selectbox(f"Passaggi % ({nome_g})", passaggi_opt, index=idx_pass_res, key=f"pas_res_{i}")
             with c4:
-                perse = st.number_input(f"Palle Perse ({nome_g})", 0, 10, int(current_vals.get("perse", 0)), key=f"per_res_{i}")
+                perse = st.number_input(f"Perse ({nome_g})", 0, 10, int(current_vals.get("perse", 0)), key=f"per_res_{i}")
             with c5:
                 tiri = st.text_input(f"Tiri P/Sp ({nome_g})", str(current_vals.get("tiri", "0/0")), key=f"tir_res_{i}")
             
-            p_dati["dati_prestazione"][nome_g] = {"minuti": minuti, "duelli": duelli, "passaggi": passaggi, "perse": perse, "tiri": tiri, "salvataggi": 0}
+            # Calcolo istantaneo del voto per la riserva
+            temp_dict_res = {"minuti": minuti, "duelli": duelli, "passaggi": passaggi, "perse": perse, "tiri": tiri, "salvataggi": 0}
+            voto_live_res = calcola_voto(temp_dict_res)
+            
+            with c_voto:
+                st.markdown(f"<div style='background-color: #1e2230; border: 1px solid {tema['accent']}; padding: 8px; border-radius: 8px; text-align: center; margin-top: 24px;'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {tema['accent']};'>{voto_live_res}</span></div>", unsafe_allow_html=True)
+
+            p_dati["dati_prestazione"][nome_g] = temp_dict_res
             st.markdown("---")
 
         if st.form_submit_button("💾 Salva Parametri e Calcola Voti"):
