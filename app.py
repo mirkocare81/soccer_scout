@@ -432,7 +432,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
         p_dati["dati_prestazione"] = {}
 
     with st.form("form_inserimento_parametri"):
-        passaggi_opt = [100, 75, 50, 25, 10]
+        passaggi_opt = [100, 75, 50, 25, 10, 0]
         
         st.markdown("### 🔴 TITOLARI (Maglie 1 - 11)")
         for i in range(1, 12):
@@ -441,7 +441,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
             
             st.markdown(f"**N° {i} — {nome_g}**")
             current_vals = p_dati["dati_prestazione"].get(nome_g, {
-                "minuti": 80, "duelli": "5/5", "passaggi": 75, "perse": 0, "tiri": "0/0", "salvataggi": 0
+                "minuti": 80, "duelli": "0/0", "passaggi": 0, "perse": 0, "tiri": "0/0", "salvataggi": 0
             })
             
             c1, c2, c3, c4, c5, c_voto = st.columns([1.2, 1.2, 1.2, 1, 1.2, 1])
@@ -476,7 +476,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
             
             st.markdown(f"**N° {i} — {nome_g} (Riserva)**")
             current_vals = p_dati["dati_prestazione"].get(nome_g, {
-                "minuti": 0, "duelli": "0/0", "passaggi": 75, "perse": 0, "tiri": "0/0", "salvataggi": 0
+                "minuti": 0, "duelli": "0/0", "passaggi": 0, "perse": 0, "tiri": "0/0", "salvataggi": 0
             })
             
             c1, c2, c3, c4, c5, c_voto = st.columns([1.2, 1.2, 1.2, 1, 1.2, 1])
