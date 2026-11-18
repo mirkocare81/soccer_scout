@@ -520,7 +520,7 @@ elif menu == "📈 Riepilogo Squadra":
     c3.metric("Trend di Rendimento", trend)
 
 # =====================================================================
-# 4. GESTIONE ROSA
+# 4. GESTIONE ROSA (CON GESTIONE ROBUSTA DELLE CODIFICHE CSV)
 # =====================================================================
 elif menu == "👤 Gestione Rosa":
     st.title("👤 Gestione Rosa Squadra")
@@ -549,15 +549,25 @@ elif menu == "👤 Gestione Rosa":
 
     uploaded_csv = st.file_uploader("📤 Carica file CSV compilato con la nuova rosa", type=["csv"])
     if uploaded_csv is not None:
-        try:
-            df_upload = pd.read_csv(uploaded_csv)
+        df_upload = None
+        # Tentativo di lettura con diverse codifiche per evitare errori di caratteri accentati (es. 'è')
+        for enc in ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']:
+            try:
+                uploaded_csv.seek(0)
+                df_upload = pd.read_csv(uploaded_csv, encoding=enc)
+                break
+            except Exception:
+                continue
+        
+        if df_upload is not None:
             if "Nome" in df_upload.columns and "Ruolo" in df_upload.columns:
+                st.success(f"File CSV letto con successo! Trovati {len(df_upload)} record.")
                 if st.button("✅ Conferma e Sostituisci Rosa con il File Caricato", type="primary"):
                     nuova_rosa = {}
                     for _, row in df_upload.iterrows():
                         nome = str(row["Nome"]).strip()
                         ruolo = str(row["Ruolo"]).strip()
-                        if nome:
+                        if nome and nome.lower() != 'nan':
                             nuova_rosa[nome] = {"ruolo": ruolo, "partite": {}}
                     st.session_state["database_giocatori"] = nuova_rosa
                     salva_dati_su_disco()
@@ -565,8 +575,8 @@ elif menu == "👤 Gestione Rosa":
                     st.rerun()
             else:
                 st.error("Il file CSV deve contenere esattamente le colonne 'Nome' e 'Ruolo'.")
-        except Exception as e:
-            st.error(f"Errore nella lettura del file CSV: {e}")
+        else:
+            st.error("Errore nella lettura del file CSV: impossibile decodificare il file con le codifiche supportate.")
 
     st.divider()
 
