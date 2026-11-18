@@ -109,6 +109,7 @@ else:
         st.session_state["database_partite"] = {
             "Virtus (15/03/2026)": {
                 "avversario": "Virtus", "data": "15/03/2026", "modulo": "4-4-2",
+                "risultato": "N.D.", "casa_trasferta": "Casa",
                 "formazione": {str(i): (list(st.session_state["database_giocatori"].keys())[i-1] if i <= len(st.session_state["database_giocatori"]) else "") for i in range(1, 21)},
                 "dati_prestazione": {}
             }
@@ -147,34 +148,6 @@ st.markdown(f"""
     table {{ background-color: {tema['bg_card']}; border-radius: {tema['border_radius']}px; overflow: hidden; border: 1px solid {tema['border_color']}; width: 100% !important; }}
     th {{ background-color: {tema['accent']} !important; color: #ffffff !important; text-align: center !important; }}
     td {{ color: {tema['text_color']} !important; border-color: {tema['border_color']} !important; }}
-    
-    .football-pitch {{
-        background: linear-gradient(180deg, #166534 0%, #15803d 100%);
-        border: 3px solid #ffffff; border-radius: 12px;
-        padding: 20px; position: relative; height: 540px; width: 100%;
-        box-shadow: inset 0 0 30px rgba(0,0,0,0.5);
-    }}
-    .pitch-line-center {{
-        position: absolute; top: 50%; left: 0; right: 0; height: 2px; background: rgba(255,255,255,0.6);
-    }}
-    .pitch-circle {{
-        position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-        width: 90px; height: 90px; border: 2px solid rgba(255,255,255,0.6); border-radius: 50%;
-    }}
-    .player-token {{
-        position: absolute; text-align: center; width: 90px; transform: translateX(-50%);
-    }}
-    .player-circle {{
-        background: #dc2626; color: white; width: 38px; height: 38px;
-        border-radius: 50%; display: flex; align-items: center; justify-content: center;
-        font-weight: bold; margin: 0 auto; border: 2px solid white; box-shadow: 0 4px 6px rgba(0,0,0,0.4);
-        font-size: 14px;
-    }}
-    .player-name-tag {{
-        background: rgba(0,0,0,0.75); color: #f3f4f6; font-size: 11px;
-        padding: 2px 6px; border-radius: 4px; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        display: inline-block; max-width: 90px;
-    }}
     {fullscreen_css}
 </style>
 """, unsafe_allow_html=True)
@@ -259,6 +232,7 @@ def genera_pdf_partita(match_name, match_data, db_giocatori, accent_hex):
     if LOGO_PATH and os.path.exists(LOGO_PATH):
         elements.append(RLImage(LOGO_PATH, width=50, height=50))
     elements.append(Paragraph(f"<b>USO Nuvolento - Report Partita: {match_name}</b>", title_style))
+    elements.append(Paragraph(f"<b>Avversario:</b> {match_data.get('avversario', '')} | <b>Risultato:</b> {match_data.get('risultato', 'N.D.')} | <b>{match_data.get('casa_trasferta', 'Casa')}</b>", sub_style))
     elements.append(Paragraph(f"<b>Modulo:</b> {match_data['modulo']} | <b>Data:</b> {match_data['data']}", sub_style))
     elements.append(Spacer(1, 10))
 
@@ -296,7 +270,7 @@ if time.time() - st.session_state["last_auto_save"] > 30:
 menu = st.sidebar.radio("Navigazione", ["📋 Setup Partite & Formazioni", "⚡ Inserimento Parametri & Voti", "📈 Riepilogo Squadra", "👤 Gestione Rosa", "🎨 Editor Grafica"])
 
 # =====================================================================
-# 1. SETUP PARTITE & FORMAZIONI (CON CAMPO DA CALCIO & CERCHI NUMERATI)
+# 1. SETUP PARTITE & FORMAZIONI (CON RISULTATO E CASA/TRASFERTA)
 # =====================================================================
 if menu == "📋 Setup Partite & Formazioni":
     st.title("📋 Setup Partite & Formazioni Titolari / Riserve")
@@ -310,11 +284,14 @@ if menu == "📋 Setup Partite & Formazioni":
                 n_avv = st.text_input("Squadra Avversaria")
                 n_data = st.text_input("Data (es. 29/03/2026)")
                 n_mod = st.selectbox("Modulo Titolari", ["4-4-2", "4-3-3", "3-5-2", "4-2-3-1"])
+                n_ris = st.text_input("Risultato (es. 2-1)", value="N.D.")
+                n_ct = st.selectbox("Casa / Trasferta", ["Casa", "Trasferta"])
                 if st.form_submit_button("Crea Partita") and n_avv:
                     nome_p = f"{n_avv} ({n_data})"
                     if nome_p not in db_partite:
                         db_partite[nome_p] = {
                             "avversario": n_avv, "data": n_data, "modulo": n_mod,
+                            "risultato": n_ris, "casa_trasferta": n_ct,
                             "formazione": {str(i): "" for i in range(1, 21)},
                             "dati_prestazione": {}
                         }
@@ -324,17 +301,30 @@ if menu == "📋 Setup Partite & Formazioni":
 
     if partita_selezionata:
         p_info = db_partite[partita_selezionata]
+        
+        # Assicura retrocompatibilità con vecchi salvataggi
+        if "risultato" not in p_info: p_info["risultato"] = "N.D."
+        if "casa_trasferta" not in p_info: p_info["casa_trasferta"] = "Casa"
+
         st.divider()
-        st.subheader(f"⚙️ Configurazione Formazione: {partita_selezionata}")
+        st.subheader(f"⚙️ Configurazione Partita & Formazione: {partita_selezionata}")
 
         with st.form(f"config_partita_{partita_selezionata}"):
-            col_mod, col_info_mod = st.columns([1, 2])
-            with col_mod:
+            c_avv, c_res, c_ct, c_mod = st.columns(4)
+            with c_avv:
+                nuovo_avv = st.text_input("Squadra Avversaria", value=p_info.get("avversario", ""))
+            with c_res:
+                nuovo_risultato = st.text_input("Risultato (es. 3-1)", value=p_info.get("risultato", "N.D."))
+            with c_ct:
+                ct_opts = ["Casa", "Trasferta"]
+                idx_ct = ct_opts.index(p_info.get("casa_trasferta", "Casa")) if p_info.get("casa_trasferta", "Casa") in ct_opts else 0
+                nuovo_ct = st.selectbox("Casa / Trasferta", ct_opts, index=idx_ct)
+            with c_mod:
                 moduli_disponibili = ["4-4-2", "4-3-3", "3-5-2", "4-2-3-1"]
                 idx_mod = moduli_disponibili.index(p_info["modulo"]) if p_info["modulo"] in moduli_disponibili else 0
                 nuovo_modulo = st.selectbox("Modulo di Gioco", moduli_disponibili, index=idx_mod)
-            with col_info_mod:
-                st.info("ℹ️ I numeri **1-11** rappresentano i titolari sul campo. I numeri **12-20** sono le riserve in panchina.")
+
+            st.info("ℹ️ I numeri **1-11** rappresentano i titolari. I numeri **12-20** sono le riserve in panchina.")
 
             nodi_rosa = [""] + list(db_giocatori.keys())
 
@@ -354,38 +344,14 @@ if menu == "📋 Setup Partite & Formazioni":
                     idx_val = nodi_rosa.index(curr_val) if curr_val in nodi_rosa else 0
                     p_info["formazione"][str(i)] = st.selectbox(f"N° {i} (Riserva)", nodi_rosa, index=idx_val, key=f"res_{i}_{partita_selezionata}")
 
-            if st.form_submit_button("Conferma e Salva Formazione"):
+            if st.form_submit_button("Conferma e Salva Dati Partita"):
+                p_info["avversario"] = nuovo_avv
+                p_info["risultato"] = nuovo_risultato
+                p_info["casa_trasferta"] = nuovo_ct
                 p_info["modulo"] = nuovo_modulo
                 salva_dati_su_disco()
-                st.success("Formazione salvata e memorizzata con successo!")
+                st.success("Dati partita e formazione salvati con successo!")
                 st.rerun()
-
-        st.divider()
-        st.subheader(f"🏟️ Visualizzazione Campo da Calcio ({p_info['modulo']})")
-
-        coordinate_moduli = {
-            "4-4-2": {1: (85, 48), 2: (65, 15), 3: (68, 38), 4: (68, 58), 5: (65, 83), 6: (45, 15), 7: (45, 38), 8: (45, 58), 9: (45, 83), 10: (20, 38), 11: (20, 58)},
-            "4-3-3": {1: (85, 48), 2: (65, 15), 3: (68, 38), 4: (68, 58), 5: (65, 83), 6: (48, 30), 7: (48, 50), 8: (48, 70), 9: (20, 18), 10: (18, 48), 11: (20, 78)},
-            "3-5-2": {1: (85, 48), 2: (68, 25), 3: (70, 48), 4: (68, 71), 5: (45, 12), 6: (48, 32), 7: (45, 48), 8: (48, 64), 9: (45, 86), 10: (20, 38), 11: (20, 58)},
-            "4-2-3-1": {1: (85, 48), 2: (65, 15), 3: (68, 38), 4: (68, 58), 5: (65, 83), 6: (52, 38), 7: (52, 58), 8: (35, 18), 9: (35, 48), 10: (35, 78), 11: (18, 48)}
-        }
-
-        coords = coordinate_moduli.get(p_info["modulo"], coordinate_moduli["4-4-2"])
-        
-        # Generazione HTML robusta del campo da calcio con cerchi numerati
-        html_pitch = '<div class="football-pitch"><div class="pitch-line-center"></div><div class="pitch-circle"></div>'
-        for num, (top_pct, left_pct) in coords.items():
-            nome_giocatore = p_info["formazione"].get(str(num), p_info["formazione"].get(num, "Vuoto"))
-            if not nome_giocatore: 
-                nome_giocatore = "Vuoto"
-            html_pitch += f'''
-            <div class="player-token" style="top: {top_pct}%; left: {left_pct}%;">
-                <div class="player-circle">{num}</div>
-                <div class="player-name-tag">{nome_giocatore}</div>
-            </div>
-            '''
-        html_pitch += '</div>'
-        st.markdown(html_pitch, unsafe_allow_html=True)
 
 # =====================================================================
 # 2. INSERIMENTO PARAMETRI & VOTI
@@ -400,7 +366,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
     partita_sel = st.selectbox("Seleziona Partita da Analizzare", list(db_partite.keys()), key="analizza_partita")
     p_dati = db_partite[partita_sel]
 
-    st.subheader(f"Analisi Match: {partita_sel} (Modulo: {p_dati['modulo']})")
+    st.subheader(f"Analisi Match: {partita_sel} (Risultato: {p_dati.get('risultato', 'N.D.')} | {p_dati.get('casa_trasferta', 'Casa')})")
 
     if partita_sel not in p_dati["dati_prestazione"]:
         p_dati["dati_prestazione"] = {}
@@ -500,7 +466,14 @@ elif menu == "📈 Riepilogo Squadra":
     for p_nome, p_val in db_partite.items():
         voti_match = [calcola_voto(d) for d in p_val.get("dati_prestazione", {}).values()]
         voto_medio = round(sum(voti_match)/len(voti_match), 1) if voti_match else 6.0
-        partite_riepilogo.append({"Partita": p_nome, "Data": p_val["data"], "Modulo": p_val["modulo"], "Voto Medio Squadra": f"{voto_medio} / 10"})
+        partite_riepilogo.append({
+            "Partita": p_nome, 
+            "Data": p_val["data"], 
+            "Risultato": p_val.get("risultato", "N.D."), 
+            "Casa/Trasferta": p_val.get("casa_trasferta", "Casa"),
+            "Modulo": p_val["modulo"], 
+            "Voto Medio Squadra": f"{voto_medio} / 10"
+        })
     
     if partite_riepilogo:
         st.table(pd.DataFrame(partite_riepilogo))
