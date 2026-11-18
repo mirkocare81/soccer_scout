@@ -120,7 +120,7 @@ tema = st.session_state["ui_theme"]
 is_fullscreen = st.session_state["fullscreen_mode"]
 
 # =====================================================================
-# APPLICAZIONE CSS & UI (BOX SCURI E PULSANTI CON HOVER ROSSO)
+# APPLICAZIONE CSS & UI (BOX SCURI, PULSANTI HOVER ROSSO E EXPANDER ICONE)
 # =====================================================================
 ombra_alfa = tema["shadow_intensity"] / 100.0
 fullscreen_css = "[data-testid=\"stSidebar\"] {display: none !important;} header {visibility: hidden !important;}" if is_fullscreen else ""
@@ -132,7 +132,7 @@ st.markdown(f"""
     h1, h2, h3, h4, h5, h6, p, label, .stMarkdown, span {{ color: {tema['text_color']} !important; }}
     [data-testid="stSidebar"] {{ background-color: {tema['bg_sidebar']}; border-right: 1px solid {tema['border_color']}; }}
     
-    /* Box metriche e info box resi scuri e leggibili */
+    /* Box metriche e info box scuri e leggibili */
     [data-testid="stMetric"], div[data-baseweb="notification"], .stAlert {{
         background-color: {tema['bg_card']} !important; border: 1px solid {tema['border_color']} !important;
         color: {tema['text_color']} !important; padding: 18px; border-radius: {tema['border_radius']}px; box-shadow: 0 6px 14px rgba(0,0,0,{ombra_alfa});
@@ -147,6 +147,24 @@ st.markdown(f"""
     }}
     .stButton > button:hover, .stDownloadButton > button:hover {{
         background-color: #ef4444 !important; border-color: #ef4444 !important; color: #ffffff !important;
+    }}
+
+    /* Stile compatto per gli expander icona (+ e -) nella riga setup */
+    [data-testid="stExpander"] {{
+        background-color: {tema['bg_card']} !important;
+        border: 1px solid {tema['border_color']} !important;
+        border-radius: {tema['border_radius']}px !important;
+    }}
+    [data-testid="stExpander"] summary {{
+        font-size: 20px !important;
+        font-weight: bold !important;
+        text-align: center !important;
+        justify-content: center !important;
+        padding: 4px !important;
+    }}
+    [data-testid="stExpander"] summary p {{
+        text-align: center !important;
+        width: 100% !important;
     }}
 
     /* Campi di input e select scuri */
@@ -279,15 +297,16 @@ if time.time() - st.session_state["last_auto_save"] > 30:
 menu = st.sidebar.radio("Navigazione", ["📋 Setup Partite & Formazioni", "⚡ Inserimento Parametri & Voti", "📈 Riepilogo Squadra", "👤 Gestione Rosa", "🎨 Editor Grafica"])
 
 # =====================================================================
-# 1. SETUP PARTITE & FORMAZIONI (CON GESTIONE RISULTATO, C/T E CANCELLAZIONE)
+# 1. SETUP PARTITE & FORMAZIONI (CON PULSANTI + e - COMPATTI)
 # =====================================================================
 if menu == "📋 Setup Partite & Formazioni":
     st.title("📋 Setup Partite & Formazioni Titolari / Riserve")
 
-    col_sel_p, col_new_p, col_del_p = st.columns([2, 0.8, 0.8])
+    col_sel_p, col_new_p, col_del_p = st.columns([3, 0.4, 0.4])
     with col_sel_p:
         partita_selezionata = st.selectbox("Seleziona Partita", list(db_partite.keys()) if db_partite else ["Nessuna Partita"])
     with col_new_p:
+        st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
         with st.expander("➕"):
             with st.form("form_nuova_partita"):
                 n_avv = st.text_input("Squadra Avversaria")
@@ -308,16 +327,17 @@ if menu == "📋 Setup Partite & Formazioni":
                         st.success(f"Partita {nome_p} creata!")
                         st.rerun()
     with col_del_p:
+        st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
         with st.expander("➖"):
             if db_partite and partita_selezionata in db_partite:
-                st.warning(f"Vuoi eliminare '{partita_selezionata}'?")
-                if st.button("🗑️ Conferma Elimina"):
+                st.warning(f"Eliminare '{partita_selezionata}'?")
+                if st.button("🗑️ Conferma"):
                     del db_partite[partita_selezionata]
                     salva_dati_su_disco()
-                    st.success("Partita eliminata con successo!")
+                    st.success("Partita eliminata!")
                     st.rerun()
             else:
-                st.info("Nessuna partita da eliminare.")
+                st.info("Nessuna partita.")
 
     if db_partite and partita_selezionata in db_partite:
         p_info = db_partite[partita_selezionata]
@@ -617,6 +637,6 @@ elif menu == "🎨 Editor Grafica":
     for idx, (n_preset, v_preset) in enumerate(PRESET_TEMI.items()):
         with cols_preset[idx]:
             if st.button(n_preset, use_container_width=True):
-                st.session_state["ui_theme"] = v_preset.copy()
-                salva_dati_su_disco()
-                st.rerun()
+        st.session_state["ui_theme"] = v_preset.copy()
+        salva_dati_su_disco()
+        st.rerun()
