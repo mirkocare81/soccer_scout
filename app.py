@@ -81,7 +81,6 @@ if "fullscreen_mode" not in st.session_state:
 if "last_auto_save" not in st.session_state:
     st.session_state["last_auto_save"] = time.time()
 
-# Caricamento dati iniziali da disco o default
 dati_salvati = carica_dati_da_disco()
 if dati_salvati:
     if "database_giocatori" not in st.session_state:
@@ -295,7 +294,7 @@ if time.time() - st.session_state["last_auto_save"] > 30:
 menu = st.sidebar.radio("Navigazione", ["📋 Setup Partite & Formazioni", "⚡ Inserimento Parametri & Voti", "📈 Riepilogo Squadra", "👤 Gestione Rosa", "🎨 Editor Grafica"])
 
 # =====================================================================
-# 1. SETUP PARTITE & FORMAZIONI (CON CAMPO DA CALCIO VISIVO)
+# 1. SETUP PARTITE & FORMAZIONI (CON CAMPO DA CALCIO VISIVO CORRETTO)
 # =====================================================================
 if menu == "📋 Setup Partite & Formazioni":
     st.title("📋 Setup Partite & Formazioni Titolari / Riserve")
@@ -371,17 +370,19 @@ if menu == "📋 Setup Partite & Formazioni":
 
         coords = coordinate_moduli.get(p_info["modulo"], coordinate_moduli["4-4-2"])
         
-        html_pitch = """<div class="football-pitch"><div class="pitch-line-center"></div><div class="pitch-circle"></div>"""
+        # Generazione HTML robusta del campo da calcio senza errori di tag
+        html_pitch = '<div class="football-pitch"><div class="pitch-line-center"></div><div class="pitch-circle"></div>'
         for num, (top_pct, left_pct) in coords.items():
             nome_giocatore = p_info["formazione"].get(str(num), p_info["formazione"].get(num, "Vuoto"))
-            if not nome_giocatore: nome_giocatore = "Vuoto"
-            html_pitch += f"""
+            if not nome_giocatore: 
+                nome_giocatore = "Vuoto"
+            html_pitch += f'''
             <div class="player-token" style="top: {top_pct}%; left: {left_pct}%;">
                 <div class="player-shirt">{num}</div>
                 <div class="player-name-tag">{nome_giocatore}</div>
             </div>
-            """
-        html_pitch += "</div>"
+            '''
+        html_pitch += '</div>'
         st.markdown(html_pitch, unsafe_allow_html=True)
 
 # =====================================================================
@@ -520,7 +521,7 @@ elif menu == "📈 Riepilogo Squadra":
     c3.metric("Trend di Rendimento", trend)
 
 # =====================================================================
-# 4. GESTIONE ROSA (CON GESTIONE ROBUSTA DELLE CODIFICHE CSV)
+# 4. GESTIONE ROSA
 # =====================================================================
 elif menu == "👤 Gestione Rosa":
     st.title("👤 Gestione Rosa Squadra")
@@ -550,7 +551,6 @@ elif menu == "👤 Gestione Rosa":
     uploaded_csv = st.file_uploader("📤 Carica file CSV compilato con la nuova rosa", type=["csv"])
     if uploaded_csv is not None:
         df_upload = None
-        # Tentativo di lettura con diverse codifiche per evitare errori di caratteri accentati (es. 'è')
         for enc in ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']:
             try:
                 uploaded_csv.seek(0)
@@ -576,7 +576,7 @@ elif menu == "👤 Gestione Rosa":
             else:
                 st.error("Il file CSV deve contenere esattamente le colonne 'Nome' e 'Ruolo'.")
         else:
-            st.error("Errore nella lettura del file CSV: impossibile decodificare il file con le codifiche supportate.")
+            st.error("Errore nella lettura del file CSV: impossibile decodificare il file.")
 
     st.divider()
 
