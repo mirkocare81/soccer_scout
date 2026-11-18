@@ -20,7 +20,7 @@ except ImportError:
 # CONFIGURAZIONE PAGINA STREAMLIT
 # =====================================================================
 st.set_page_config(
-    page_title="ScoutAI - Match Analysis & Formations",
+    page_title="USO NUVOLENTO UNDER 16 - Match Analysis & Formations",
     page_icon="⚽",
     layout="wide",
     initial_sidebar_state="expanded"
