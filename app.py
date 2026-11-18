@@ -389,7 +389,7 @@ if menu == "📋 Setup Partite & Formazioni":
                 st.rerun()
 
 # =====================================================================
-# 2. INSERIMENTO PARAMETRI & VOTI (CON BOX VOTO IN TEMPO REALE A DESTRA)
+# 2. INSERIMENTO PARAMETRI & VOTI (ETICHETTE PARAMETRI PULITE)
 # =====================================================================
 elif menu == "⚡ Inserimento Parametri & Voti":
     st.title("⚡ Inserimento Parametri Post-Partita & Voti")
@@ -419,22 +419,20 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 "minuti": 80, "duelli": "5/5", "passaggi": 75, "perse": 0, "tiri": "0/0", "salvataggi": 0
             })
             
-            # Layout: 5 colonne per i parametri + 1 colonna a destra per il Voto in tempo reale
             c1, c2, c3, c4, c5, c_voto = st.columns([1.2, 1.2, 1.2, 1, 1.2, 1])
             with c1:
-                minuti = st.number_input(f"Minuti ({nome_g})", 1, 80, int(current_vals.get("minuti", 80)), key=f"min_{i}")
+                minuti = st.number_input("Minuti", 1, 80, int(current_vals.get("minuti", 80)), key=f"min_{i}")
             with c2:
-                duelli = st.text_input(f"Duelli V/T ({nome_g})", str(current_vals.get("duelli", "5/5")), key=f"due_{i}")
+                duelli = st.text_input("Duelli V/T", str(current_vals.get("duelli", "5/5")), key=f"due_{i}")
             with c3:
                 val_pass = int(current_vals.get("passaggi", 75))
                 idx_pass = passaggi_opt.index(val_pass) if val_pass in passaggi_opt else 1
-                passaggi = st.selectbox(f"Passaggi % ({nome_g})", passaggi_opt, index=idx_pass, key=f"pas_{i}")
+                passaggi = st.selectbox("Passaggi %", passaggi_opt, index=idx_pass, key=f"pas_{i}")
             with c4:
-                perse = st.number_input(f"Perse ({nome_g})", 0, 10, int(current_vals.get("perse", 0)), key=f"per_{i}")
+                perse = st.number_input("Perse", 0, 10, int(current_vals.get("perse", 0)), key=f"per_{i}")
             with c5:
-                tiri = st.text_input(f"Tiri P/Sp ({nome_g})", str(current_vals.get("tiri", "0/0")), key=f"tir_{i}")
+                tiri = st.text_input("Tiri P/Sp", str(current_vals.get("tiri", "0/0")), key=f"tir_{i}")
             
-            # Calcolo istantaneo del voto con i valori correnti del form
             temp_dict = {"minuti": minuti, "duelli": duelli, "passaggi": passaggi, "perse": perse, "tiri": tiri, "salvataggi": 0}
             voto_live = calcola_voto(temp_dict)
             
@@ -458,19 +456,18 @@ elif menu == "⚡ Inserimento Parametri & Voti":
             
             c1, c2, c3, c4, c5, c_voto = st.columns([1.2, 1.2, 1.2, 1, 1.2, 1])
             with c1:
-                minuti = st.number_input(f"Min sub ({nome_g})", 0, 80, int(current_vals.get("minuti", 0)), key=f"min_res_{i}")
+                minuti = st.number_input("Min sub", 0, 80, int(current_vals.get("minuti", 0)), key=f"min_res_{i}")
             with c2:
-                duelli = st.text_input(f"Duelli V/T ({nome_g})", str(current_vals.get("duelli", "0/0")), key=f"due_res_{i}")
+                duelli = st.text_input("Duelli V/T", str(current_vals.get("duelli", "0/0")), key=f"due_res_{i}")
             with c3:
                 val_pass_res = int(current_vals.get("passaggi", 75))
                 idx_pass_res = passaggi_opt.index(val_pass_res) if val_pass_res in passaggi_opt else 1
-                passaggi = st.selectbox(f"Passaggi % ({nome_g})", passaggi_opt, index=idx_pass_res, key=f"pas_res_{i}")
+                passaggi = st.selectbox("Passaggi %", passaggi_opt, index=idx_pass_res, key=f"pas_res_{i}")
             with c4:
-                perse = st.number_input(f"Perse ({nome_g})", 0, 10, int(current_vals.get("perse", 0)), key=f"per_res_{i}")
+                perse = st.number_input("Perse", 0, 10, int(current_vals.get("perse", 0)), key=f"per_res_{i}")
             with c5:
-                tiri = st.text_input(f"Tiri P/Sp ({nome_g})", str(current_vals.get("tiri", "0/0")), key=f"tir_res_{i}")
+                tiri = st.text_input("Tiri P/Sp", str(current_vals.get("tiri", "0/0")), key=f"tir_res_{i}")
             
-            # Calcolo istantaneo del voto per la riserva
             temp_dict_res = {"minuti": minuti, "duelli": duelli, "passaggi": passaggi, "perse": perse, "tiri": tiri, "salvataggi": 0}
             voto_live_res = calcola_voto(temp_dict_res)
             
