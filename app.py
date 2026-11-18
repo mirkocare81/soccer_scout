@@ -206,7 +206,7 @@ with col_title_h:
 st.divider()
 
 # =====================================================================
-# MOTORE DI CALCOLO VOTO & TREND (DISTINTO PORTIERE / MOVIMENTO)
+# MOTORE DI CALCOLO VOTO & TREND
 # =====================================================================
 def calcola_voto(p, is_portiere=False):
     try:
@@ -295,7 +295,7 @@ def genera_pdf_partita(match_name, match_data, db_giocatori, accent_hex):
     t_data = [["N°", "Giocatore", "Ruolo", "Min.", "Statistiche Chiave", "Voto"]]
     for num, nome in match_data["formazione"].items():
         if not nome: continue
-        p_dati = db_giocatori.get(nome, {}).get("partite", {}).get(match_name, {})
+        p_dati = match_data.get("dati_prestazione", {}).get(nome, {})
         is_portiere = (str(num) in ["1", "12"])
         voto = calcola_voto(p_dati, is_portiere) if p_dati else "N.D."
         ruolo = db_giocatori.get(nome, {}).get("ruolo", "Portiere" if is_portiere else "Movimento")
@@ -388,6 +388,7 @@ if menu == "📋 Setup Partite & Formazioni":
         if "risultato" not in p_info: p_info["risultato"] = "N.D."
         if "casa_trasferta" not in p_info: p_info["casa_trasferta"] = "Casa"
         if "youtube_link" not in p_info: p_info["youtube_link"] = ""
+        if "dati_prestazione" not in p_info: p_info["dati_prestazione"] = {}
 
         st.divider()
         st.subheader(f"⚙️ Configurazione Partita & Formazione: {partita_selezionata}")
@@ -439,7 +440,7 @@ if menu == "📋 Setup Partite & Formazioni":
                 st.rerun()
 
 # =====================================================================
-# 2. INSERIMENTO PARAMETRI & VOTI (PORTIERE VS MOVIMENTO)
+# 2. INSERIMENTO PARAMETRI & VOTI (SALVATAGGIO ISOLATO PER PARTITA)
 # =====================================================================
 elif menu == "⚡ Inserimento Parametri & Voti":
     st.title("⚡ Inserimento Parametri Post-Partita & Voti")
@@ -451,10 +452,10 @@ elif menu == "⚡ Inserimento Parametri & Voti":
     partita_sel = st.selectbox("Seleziona Partita da Analizzare", list(db_partite.keys()), key="analizza_partita")
     p_dati = db_partite[partita_sel]
 
-    st.subheader(f"Analisi Match: {partita_sel} (Risultato: {p_dati.get('risultato', 'N.D.')} | {p_dati.get('casa_trasferta', 'Casa')})")
-
-    if partita_sel not in p_dati["dati_prestazione"]:
+    if "dati_prestazione" not in p_dati:
         p_dati["dati_prestazione"] = {}
+
+    st.subheader(f"Analisi Match: {partita_sel} (Risultato: {p_dati.get('risultato', 'N.D.')} | {p_dati.get('casa_trasferta', 'Casa')})")
 
     with st.form("form_inserimento_parametri"):
         passaggi_opt = [100, 75, 50, 25, 10]
@@ -470,17 +471,17 @@ elif menu == "⚡ Inserimento Parametri & Voti":
             
             if is_portiere:
                 current_vals = p_dati["dati_prestazione"].get(nome_g, {
-                    "minuti": 80, "parate": 0, "uscite": "0/0", "gol_subiti_resp": "0/0"
+                    "minuti": 80, "parate": 0, "uscite": "0/1", "gol_subiti_resp": "0/0"
                 })
                 c1, c2, c3, c4, c_voto = st.columns([1.5, 1.5, 1.5, 1.5, 1])
                 with c1:
-                    minuti = st.number_input("Minuti", 1, 80, int(current_vals.get("minuti", 80)), key=f"min_{i}")
+                    minuti = st.number_input("Minuti", 1, 80, int(current_vals.get("minuti", 80)), key=f"min_{partita_sel}_{i}")
                 with c2:
-                    parate = st.number_input("Parate", 0, 20, int(current_vals.get("parate", 0)), key=f"par_{i}")
+                    parate = st.number_input("Parate", 0, 20, int(current_vals.get("parate", 0)), key=f"par_{partita_sel}_{i}")
                 with c3:
-                    uscite = st.text_input("Uscite tent./rius.", str(current_vals.get("uscite", "0/1")), key=f"usc_{i}")
+                    uscite = st.text_input("Uscite tent./rius.", str(current_vals.get("uscite", "0/1")), key=f"usc_{partita_sel}_{i}")
                 with c4:
-                    gol_subiti_resp = st.text_input("Gol sub./resp.", str(current_vals.get("gol_subiti_resp", "0/0")), key=f"gol_sub_{i}")
+                    gol_subiti_resp = st.text_input("Gol sub./resp.", str(current_vals.get("gol_subiti_resp", "0/0")), key=f"gol_sub_{partita_sel}_{i}")
                 
                 temp_dict = {"minuti": minuti, "parate": parate, "uscite": uscite, "gol_subiti_resp": gol_subiti_resp}
                 voto_live = calcola_voto(temp_dict, is_portiere=True)
@@ -491,23 +492,23 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 p_dati["dati_prestazione"][nome_g] = temp_dict
             else:
                 current_vals = p_dati["dati_prestazione"].get(nome_g, {
-                    "minuti": 80, "duelli": "0/0", "passaggi": 0, "perse": 0, "tiri": "0/0", "gol_fatti": 0
+                    "minuti": 80, "duelli": "5/5", "passaggi": 75, "perse": 0, "tiri": "0/0", "gol_fatti": 0
                 })
                 c1, c2, c3, c4, c5, c6, c_voto = st.columns([1, 1, 1, 0.8, 1, 0.8, 1])
                 with c1:
-                    minuti = st.number_input("Minuti", 1, 80, int(current_vals.get("minuti", 80)), key=f"min_{i}")
+                    minuti = st.number_input("Minuti", 1, 80, int(current_vals.get("minuti", 80)), key=f"min_{partita_sel}_{i}")
                 with c2:
-                    duelli = st.text_input("Duelli V/T", str(current_vals.get("duelli", "5/5")), key=f"due_{i}")
+                    duelli = st.text_input("Duelli V/T", str(current_vals.get("duelli", "5/5")), key=f"due_{partita_sel}_{i}")
                 with c3:
                     val_pass = int(current_vals.get("passaggi", 75))
                     idx_pass = passaggi_opt.index(val_pass) if val_pass in passaggi_opt else 1
-                    passaggi = st.selectbox("Pass %", passaggi_opt, index=idx_pass, key=f"pas_{i}")
+                    passaggi = st.selectbox("Pass %", passaggi_opt, index=idx_pass, key=f"pas_{partita_sel}_{i}")
                 with c4:
-                    perse = st.number_input("Perse", 0, 10, int(current_vals.get("perse", 0)), key=f"per_{i}")
+                    perse = st.number_input("Perse", 0, 10, int(current_vals.get("perse", 0)), key=f"per_{partita_sel}_{i}")
                 with c5:
-                    tiri = st.text_input("Tiri P/Sp", str(current_vals.get("tiri", "0/0")), key=f"tir_{i}")
+                    tiri = st.text_input("Tiri P/Sp", str(current_vals.get("tiri", "0/0")), key=f"tir_{partita_sel}_{i}")
                 with c6:
-                    gol_fatti = st.number_input("Gol", 0, 5, int(current_vals.get("gol_fatti", 0)), key=f"gol_{i}")
+                    gol_fatti = st.number_input("Gol", 0, 5, int(current_vals.get("gol_fatti", 0)), key=f"gol_{partita_sel}_{i}")
                 
                 temp_dict = {"minuti": minuti, "duelli": duelli, "passaggi": passaggi, "perse": perse, "tiri": tiri, "gol_fatti": gol_fatti, "salvataggi": 0}
                 voto_live = calcola_voto(temp_dict, is_portiere=False)
@@ -536,13 +537,13 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 })
                 c1, c2, c3, c4, c_voto = st.columns([1.5, 1.5, 1.5, 1.5, 1])
                 with c1:
-                    minuti = st.number_input("Min sub", 0, 80, int(current_vals.get("minuti", 0)), key=f"min_res_{i}")
+                    minuti = st.number_input("Min sub", 0, 80, int(current_vals.get("minuti", 0)), key=f"min_res_{partita_sel}_{i}")
                 with c2:
-                    parate = st.number_input("Parate", 0, 20, int(current_vals.get("parate", 0)), key=f"par_res_{i}")
+                    parate = st.number_input("Parate", 0, 20, int(current_vals.get("parate", 0)), key=f"par_res_{partita_sel}_{i}")
                 with c3:
-                    uscite = st.text_input("Uscite tent./rius.", str(current_vals.get("uscite", "0/0")), key=f"usc_res_{i}")
+                    uscite = st.text_input("Uscite tent./rius.", str(current_vals.get("uscite", "0/0")), key=f"usc_res_{partita_sel}_{i}")
                 with c4:
-                    gol_subiti_resp = st.text_input("Gol sub./resp.", str(current_vals.get("gol_subiti_resp", "0/0")), key=f"gol_sub_res_{i}")
+                    gol_subiti_resp = st.text_input("Gol sub./resp.", str(current_vals.get("gol_subiti_resp", "0/0")), key=f"gol_sub_res_{partita_sel}_{i}")
                 
                 temp_dict_res = {"minuti": minuti, "parate": parate, "uscite": uscite, "gol_subiti_resp": gol_subiti_resp}
                 voto_live_res = calcola_voto(temp_dict_res, is_portiere=True)
@@ -557,19 +558,19 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 })
                 c1, c2, c3, c4, c5, c6, c_voto = st.columns([1, 1, 1, 0.8, 1, 0.8, 1])
                 with c1:
-                    minuti = st.number_input("Min sub", 0, 80, int(current_vals.get("minuti", 0)), key=f"min_res_{i}")
+                    minuti = st.number_input("Min sub", 0, 80, int(current_vals.get("minuti", 0)), key=f"min_res_{partita_sel}_{i}")
                 with c2:
-                    duelli = st.text_input("Duelli V/T", str(current_vals.get("duelli", "0/0")), key=f"due_res_{i}")
+                    duelli = st.text_input("Duelli V/T", str(current_vals.get("duelli", "0/0")), key=f"due_res_{partita_sel}_{i}")
                 with c3:
                     val_pass_res = int(current_vals.get("passaggi", 75))
                     idx_pass_res = passaggi_opt.index(val_pass_res) if val_pass_res in passaggi_opt else 1
-                    passaggi = st.selectbox("Pass %", passaggi_opt, index=idx_pass_res, key=f"pas_res_{i}")
+                    passaggi = st.selectbox("Pass %", passaggi_opt, index=idx_pass_res, key=f"pas_res_{partita_sel}_{i}")
                 with c4:
-                    perse = st.number_input("Perse", 0, 10, int(current_vals.get("perse", 0)), key=f"per_res_{i}")
+                    perse = st.number_input("Perse", 0, 10, int(current_vals.get("perse", 0)), key=f"per_res_{partita_sel}_{i}")
                 with c5:
-                    tiri = st.text_input("Tiri P/Sp", str(current_vals.get("tiri", "0/0")), key=f"tir_res_{i}")
+                    tiri = st.text_input("Tiri P/Sp", str(current_vals.get("tiri", "0/0")), key=f"tir_res_{partita_sel}_{i}")
                 with c6:
-                    gol_fatti = st.number_input("Gol", 0, 5, int(current_vals.get("gol_fatti", 0)), key=f"gol_res_{i}")
+                    gol_fatti = st.number_input("Gol", 0, 5, int(current_vals.get("gol_fatti", 0)), key=f"gol_res_{partita_sel}_{i}")
                 
                 temp_dict_res = {"minuti": minuti, "duelli": duelli, "passaggi": passaggi, "perse": perse, "tiri": tiri, "gol_fatti": gol_fatti, "salvataggi": 0}
                 voto_live_res = calcola_voto(temp_dict_res, is_portiere=False)
@@ -583,7 +584,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
 
         if st.form_submit_button("💾 Salva Parametri e Calcola Voti"):
             salva_dati_su_disco()
-            st.success("Parametri salvati automaticamente su disco e voti aggiornati!")
+            st.success("Parametri salvati automaticamente su disco e voti aggiornati per questa partita!")
             st.rerun()
 
     st.divider()
