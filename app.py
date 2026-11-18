@@ -4,6 +4,7 @@ import io
 import time
 import os
 import json
+import re
 
 # Import protetto di ReportLab (se non installato, l'app non va in crash)
 try:
@@ -51,6 +52,22 @@ def carica_dati_da_disco():
                 return json.load(f)
         except:
             pass
+    return None
+
+# Funzione di utilità per estrarre l'ID di YouTube da vari formati di link
+def estrai_youtube_id(url):
+    if not url:
+        return None
+    patterns = [
+        r'(?:v=|\/v\/|embed\/|e\/|watch\?v=|watch\?.+&v=)([\w-]{11})',
+        r'(?:youtu\.be\/)([\w-]{11})'
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, url)
+        if match:
+            return match.group(1)
+    if len(url) == 11:
+        return url
     return None
 
 # =====================================================================
@@ -109,7 +126,7 @@ else:
         st.session_state["database_partite"] = {
             "Virtus (15/03/2026)": {
                 "avversario": "Virtus", "data": "15/03/2026", "modulo": "4-4-2",
-                "risultato": "N.D.", "casa_trasferta": "Casa",
+                "risultato": "N.D.", "casa_trasferta": "Casa", "youtube_link": "",
                 "formazione": {str(i): (list(st.session_state["database_giocatori"].keys())[i-1] if i <= len(st.session_state["database_giocatori"]) else "") for i in range(1, 21)},
                 "dati_prestazione": {}
             }
@@ -290,7 +307,14 @@ if time.time() - st.session_state["last_auto_save"] > 30:
     st.session_state["last_auto_save"] = time.time()
     salva_dati_su_disco()
 
-menu = st.sidebar.radio("Navigazione", ["📋 Setup Partite & Formazioni", "⚡ Inserimento Parametri & Voti", "📈 Riepilogo Squadra", "👤 Gestione Rosa", "🎨 Editor Grafica"])
+menu = st.sidebar.radio("Navigazione", [
+    "📋 Setup Partite & Formazioni", 
+    "⚡ Inserimento Parametri & Voti", 
+    "🎥 Video Analisi", 
+    "📈 Riepilogo Squadra", 
+    "👤 Gestione Rosa", 
+    "🎨 Editor Grafica"
+])
 
 # =====================================================================
 # 1. SETUP PARTITE & FORMAZIONI
@@ -315,7 +339,7 @@ if menu == "📋 Setup Partite & Formazioni":
                     if nome_p not in db_partite:
                         db_partite[nome_p] = {
                             "avversario": n_avv, "data": n_data, "modulo": n_mod,
-                            "risultato": n_ris, "casa_trasferta": n_ct,
+                            "risultato": n_ris, "casa_trasferta": n_ct, "youtube_link": "",
                             "formazione": {str(i): "" for i in range(1, 21)},
                             "dati_prestazione": {}
                         }
@@ -340,6 +364,7 @@ if menu == "📋 Setup Partite & Formazioni":
         
         if "risultato" not in p_info: p_info["risultato"] = "N.D."
         if "casa_trasferta" not in p_info: p_info["casa_trasferta"] = "Casa"
+        if "youtube_link" not in p_info: p_info["youtube_link"] = ""
 
         st.divider()
         st.subheader(f"⚙️ Configurazione Partita & Formazione: {partita_selezionata}")
@@ -389,7 +414,7 @@ if menu == "📋 Setup Partite & Formazioni":
                 st.rerun()
 
 # =====================================================================
-# 2. INSERIMENTO PARAMETRI & VOTI (ETICHETTE PARAMETRI PULITE)
+# 2. INSERIMENTO PARAMETRI & VOTI
 # =====================================================================
 elif menu == "⚡ Inserimento Parametri & Voti":
     st.title("⚡ Inserimento Parametri Post-Partita & Voti")
@@ -504,7 +529,76 @@ elif menu == "⚡ Inserimento Parametri & Voti":
             st.download_button("📊 Esporta CSV Match", csv_data, file_name=f"Match_{partita_sel}.csv", mime="text/csv")
 
 # =====================================================================
-# 3. RIEPILOGO SQUADRA & GIOCATORI
+# 3. VIDEO ANALISI
+# =====================================================================
+elif menu == "🎥 Video Analisi":
+    st.title("🎥 Video Analisi & Streaming Partita")
+
+    if not db_partite:
+        st.warning("⚠️ Crea prima una partita nella sezione 'Setup Partite & Formazioni'.")
+        st.stop()
+
+    # Selezione Partita
+    partita_sel = st.selectbox("Seleziona Partita per la Video Analisi", list(db_partite.keys()), key="video_partita")
+    p_info = db_partite[partita_sel]
+
+    if "youtube_link" not in p_info:
+        p_info["youtube_link"] = ""
+
+    st.divider()
+
+    # Header info partita in alto (Data, Risultato, Casa/Trasferta)
+    col_info1, col_info2, col_info3, col_info4 = st.columns(4)
+    col_info1.metric("Data Partita", p_info.get("data", "N.D."))
+    col_info2.metric("Risultato", p_info.get("risultato", "N.D."))
+    col_info3.metric("Luogo", p_info.get("casa_trasferta", "Casa"))
+    col_info4.metric("Modulo", p_info.get("modulo", "N.D."))
+
+    st.divider()
+
+    # Layout a due colonne: Sinistra (Input link e pulsante Play), Destra (Main Frame Video)
+    col_input_l, col_video_r = st.columns([1.2, 1.8])
+
+    with col_input_l:
+        st.subheader("🔗 Configurazione Link")
+        link_inserito = st.text_input("Inserisci Link YouTube", value=p_info.get("youtube_link", ""), placeholder="https://www.youtube.com/watch?v=...")
+        
+        # Pulsante Play / Salva Link
+        if st.button("▶️ Play Video", use_container_width=True):
+            p_info["youtube_link"] = link_inserito
+            salva_dati_su_disco()
+            st.success("Link aggiornato con successo!")
+            st.rerun()
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.info("💡 **Istruzioni:** Incolla il link del video di YouTube (intero match o clip di analisi) e clicca su **Play Video** per caricarlo nel player a destra.")
+
+    with col_video_r:
+        st.subheader("📺 Main Frame Video")
+        link_corrente = p_info.get("youtube_link", "")
+        yt_id = estrai_youtube_id(link_corrente)
+
+        if yt_id:
+            embed_url = f"https://www.youtube.com/embed/{yt_id}"
+            st.markdown(f"""
+                <div style="position: relative; width: 100%; height: 0; padding-bottom: 56.25%;">
+                    <iframe src="{embed_url}" 
+                            style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 12px; border: 1px solid {tema['border_color']};" 
+                            allowfullscreen>
+                    </iframe>
+                </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+                <div style="background-color: {tema['bg_card']}; border: 2px dashed {tema['border_color']}; border-radius: 12px; height: 320px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px;">
+                    <span style="font-size: 40px; margin-bottom: 10px;">📺</span>
+                    <p style="color: #a0aec0; margin: 0; font-size: 16px;">Nessun video caricato o link YouTube non valido.</p>
+                    <p style="color: #718096; margin-top: 5px; font-size: 13px;">Inserisci un link valido nel pannello a sinistra e premi Play.</p>
+                </div>
+            """, unsafe_allow_html=True)
+
+# =====================================================================
+# 4. RIEPILOGO SQUADRA & GIOCATORI
 # =====================================================================
 elif menu == "📈 Riepilogo Squadra":
     st.title("📈 Riepilogo Squadra & Statistiche Stagionali")
@@ -544,7 +638,7 @@ elif menu == "📈 Riepilogo Squadra":
     c3.metric("Trend di Rendimento", trend)
 
 # =====================================================================
-# 4. GESTIONE ROSA
+# 5. GESTIONE ROSA
 # =====================================================================
 elif menu == "👤 Gestione Rosa":
     st.title("👤 Gestione Rosa Squadra")
@@ -631,7 +725,7 @@ elif menu == "👤 Gestione Rosa":
                     st.rerun()
 
 # =====================================================================
-# 5. EDITOR GRAFICA & SETTINGS
+# 6. EDITOR GRAFICA & SETTINGS
 # =====================================================================
 elif menu == "🎨 Editor Grafica":
     st.title("🎨 Editor Grafica & Impostazioni UI")
