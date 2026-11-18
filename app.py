@@ -637,6 +637,6 @@ elif menu == "🎨 Editor Grafica":
     for idx, (n_preset, v_preset) in enumerate(PRESET_TEMI.items()):
         with cols_preset[idx]:
             if st.button(n_preset, use_container_width=True):
-        st.session_state["ui_theme"] = v_preset.copy()
-        salva_dati_su_disco()
-        st.rerun()
+                st.session_state["ui_theme"] = v_preset.copy()
+                salva_dati_su_disco()
+                st.rerun()
