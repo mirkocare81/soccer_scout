@@ -151,7 +151,7 @@ st.markdown(f"""
     .football-pitch {{
         background: linear-gradient(180deg, #166534 0%, #15803d 100%);
         border: 3px solid #ffffff; border-radius: 12px;
-        padding: 20px; position: relative; height: 520px; width: 100%;
+        padding: 20px; position: relative; height: 540px; width: 100%;
         box-shadow: inset 0 0 30px rgba(0,0,0,0.5);
     }}
     .pitch-line-center {{
@@ -162,16 +162,18 @@ st.markdown(f"""
         width: 90px; height: 90px; border: 2px solid rgba(255,255,255,0.6); border-radius: 50%;
     }}
     .player-token {{
-        position: absolute; text-align: center; width: 85px; transform: translateX(-50%);
+        position: absolute; text-align: center; width: 90px; transform: translateX(-50%);
     }}
-    .player-shirt {{
-        background: #dc2626; color: white; width: 36px; height: 36px;
+    .player-circle {{
+        background: #dc2626; color: white; width: 38px; height: 38px;
         border-radius: 50%; display: flex; align-items: center; justify-content: center;
-        font-weight: bold; margin: 0 auto; border: 2px solid white; box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        font-weight: bold; margin: 0 auto; border: 2px solid white; box-shadow: 0 4px 6px rgba(0,0,0,0.4);
+        font-size: 14px;
     }}
     .player-name-tag {{
-        background: rgba(0,0,0,0.7); color: #f3f4f6; font-size: 11px;
-        padding: 2px 4px; border-radius: 4px; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        background: rgba(0,0,0,0.75); color: #f3f4f6; font-size: 11px;
+        padding: 2px 6px; border-radius: 4px; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        display: inline-block; max-width: 90px;
     }}
     {fullscreen_css}
 </style>
@@ -294,7 +296,7 @@ if time.time() - st.session_state["last_auto_save"] > 30:
 menu = st.sidebar.radio("Navigazione", ["📋 Setup Partite & Formazioni", "⚡ Inserimento Parametri & Voti", "📈 Riepilogo Squadra", "👤 Gestione Rosa", "🎨 Editor Grafica"])
 
 # =====================================================================
-# 1. SETUP PARTITE & FORMAZIONI (CON CAMPO DA CALCIO VISIVO CORRETTO)
+# 1. SETUP PARTITE & FORMAZIONI (CON CAMPO DA CALCIO & CERCHI NUMERATI)
 # =====================================================================
 if menu == "📋 Setup Partite & Formazioni":
     st.title("📋 Setup Partite & Formazioni Titolari / Riserve")
@@ -370,7 +372,7 @@ if menu == "📋 Setup Partite & Formazioni":
 
         coords = coordinate_moduli.get(p_info["modulo"], coordinate_moduli["4-4-2"])
         
-        # Generazione HTML robusta del campo da calcio senza errori di tag
+        # Generazione HTML robusta del campo da calcio con cerchi numerati
         html_pitch = '<div class="football-pitch"><div class="pitch-line-center"></div><div class="pitch-circle"></div>'
         for num, (top_pct, left_pct) in coords.items():
             nome_giocatore = p_info["formazione"].get(str(num), p_info["formazione"].get(num, "Vuoto"))
@@ -378,7 +380,7 @@ if menu == "📋 Setup Partite & Formazioni":
                 nome_giocatore = "Vuoto"
             html_pitch += f'''
             <div class="player-token" style="top: {top_pct}%; left: {left_pct}%;">
-                <div class="player-shirt">{num}</div>
+                <div class="player-circle">{num}</div>
                 <div class="player-name-tag">{nome_giocatore}</div>
             </div>
             '''
