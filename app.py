@@ -120,7 +120,7 @@ tema = st.session_state["ui_theme"]
 is_fullscreen = st.session_state["fullscreen_mode"]
 
 # =====================================================================
-# APPLICAZIONE CSS & UI
+# APPLICAZIONE CSS & UI (BOX SCURI E PULSANTI CON HOVER ROSSO)
 # =====================================================================
 ombra_alfa = tema["shadow_intensity"] / 100.0
 fullscreen_css = "[data-testid=\"stSidebar\"] {display: none !important;} header {visibility: hidden !important;}" if is_fullscreen else ""
@@ -131,16 +131,25 @@ st.markdown(f"""
     .block-container {{ max-width: 100% !important; padding: 2rem 3rem !important; }}
     h1, h2, h3, h4, h5, h6, p, label, .stMarkdown, span {{ color: {tema['text_color']} !important; }}
     [data-testid="stSidebar"] {{ background-color: {tema['bg_sidebar']}; border-right: 1px solid {tema['border_color']}; }}
-    [data-testid="stMetric"] {{
-        background-color: {tema['bg_card']}; border: 1px solid {tema['border_color']};
-        padding: 18px; border-radius: {tema['border_radius']}px; box-shadow: 0 6px 14px rgba(0,0,0,{ombra_alfa});
+    
+    /* Box metriche e info box resi scuri e leggibili */
+    [data-testid="stMetric"], div[data-baseweb="notification"], .stAlert {{
+        background-color: {tema['bg_card']} !important; border: 1px solid {tema['border_color']} !important;
+        color: {tema['text_color']} !important; padding: 18px; border-radius: {tema['border_radius']}px; box-shadow: 0 6px 14px rgba(0,0,0,{ombra_alfa});
     }}
     [data-testid="stMetricValue"] {{ color: {tema['accent']} !important; }}
+
+    /* Pulsanti generali scuri con hover rosso */
     .stButton > button, .stDownloadButton > button {{
-        background-color: {tema['accent']} !important; color: #ffffff !important;
-        border-radius: {tema['border_radius']}px !important; border: none !important; font-weight: 600 !important;
-        padding: 0.6rem 1.2rem !important; width: 100% !important;
+        background-color: #1a1d29 !important; color: #ffffff !important;
+        border-radius: {tema['border_radius']}px !important; border: 1px solid {tema['border_color']} !important; font-weight: 600 !important;
+        padding: 0.6rem 1.2rem !important; width: 100% !important; transition: background-color 0.2s ease, border-color 0.2s ease;
     }}
+    .stButton > button:hover, .stDownloadButton > button:hover {{
+        background-color: #ef4444 !important; border-color: #ef4444 !important; color: #ffffff !important;
+    }}
+
+    /* Campi di input e select scuri */
     input, textarea, select, div[data-baseweb="input"] div, div[data-baseweb="select"] div {{
         background-color: {tema['bg_card']} !important; color: {tema['text_color']} !important;
         border-color: {tema['border_color']} !important; border-radius: {max(4, tema['border_radius']-4)}px !important;
@@ -227,7 +236,7 @@ def genera_pdf_partita(match_name, match_data, db_giocatori, accent_hex):
     styles = getSampleStyleSheet()
 
     title_style = ParagraphStyle('TitleStyle', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=15, textColor=colors.HexColor(accent_hex), alignment=1, spaceAfter=8)
-    sub_style = ParagraphStyle('SubStyle', parent=styles['Normal'], fontName='Helvetica', fontSize=10, textColor=colors.HexColor("#444444"), alignment=1, spaceAfter=15)
+    sub_style = ParagraphStyle('SubStyle', parent=styles['Normal'], fontName='Helvetica', fontSize=10, textColor=colors.HexColor("#cccccc"), alignment=1, spaceAfter=15)
 
     if LOGO_PATH and os.path.exists(LOGO_PATH):
         elements.append(RLImage(LOGO_PATH, width=50, height=50))
@@ -250,8 +259,8 @@ def genera_pdf_partita(match_name, match_data, db_giocatori, accent_hex):
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
         ('ALIGN', (0,0), (-1,-1), 'CENTER'),
         ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#d1d5db")),
-        ('BACKGROUND', (0,1), (-1,-1), colors.HexColor("#f3f4f6")),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#333333")),
+        ('BACKGROUND', (0,1), (-1,-1), colors.HexColor("#141721")),
     ]))
     elements.append(t)
     doc.build(elements)
@@ -270,23 +279,23 @@ if time.time() - st.session_state["last_auto_save"] > 30:
 menu = st.sidebar.radio("Navigazione", ["📋 Setup Partite & Formazioni", "⚡ Inserimento Parametri & Voti", "📈 Riepilogo Squadra", "👤 Gestione Rosa", "🎨 Editor Grafica"])
 
 # =====================================================================
-# 1. SETUP PARTITE & FORMAZIONI (CON RISULTATO E CASA/TRASFERTA)
+# 1. SETUP PARTITE & FORMAZIONI (CON GESTIONE RISULTATO, C/T E CANCELLAZIONE)
 # =====================================================================
 if menu == "📋 Setup Partite & Formazioni":
     st.title("📋 Setup Partite & Formazioni Titolari / Riserve")
 
-    col_sel_p, col_new_p = st.columns([2, 1])
+    col_sel_p, col_new_p, col_del_p = st.columns([2, 0.8, 0.8])
     with col_sel_p:
-        partita_selezionata = st.selectbox("Seleziona Partita", list(db_partite.keys()))
+        partita_selezionata = st.selectbox("Seleziona Partita", list(db_partite.keys()) if db_partite else ["Nessuna Partita"])
     with col_new_p:
-        with st.expander("➕ Crea Nuova Partita"):
+        with st.expander("➕"):
             with st.form("form_nuova_partita"):
                 n_avv = st.text_input("Squadra Avversaria")
                 n_data = st.text_input("Data (es. 29/03/2026)")
                 n_mod = st.selectbox("Modulo Titolari", ["4-4-2", "4-3-3", "3-5-2", "4-2-3-1"])
                 n_ris = st.text_input("Risultato (es. 2-1)", value="N.D.")
                 n_ct = st.selectbox("Casa / Trasferta", ["Casa", "Trasferta"])
-                if st.form_submit_button("Crea Partita") and n_avv:
+                if st.form_submit_button("💾") and n_avv:
                     nome_p = f"{n_avv} ({n_data})"
                     if nome_p not in db_partite:
                         db_partite[nome_p] = {
@@ -296,13 +305,23 @@ if menu == "📋 Setup Partite & Formazioni":
                             "dati_prestazione": {}
                         }
                         salva_dati_su_disco()
-                        st.success(f"Partita {nome_p} creata e salvata!")
+                        st.success(f"Partita {nome_p} creata!")
                         st.rerun()
+    with col_del_p:
+        with st.expander("➖"):
+            if db_partite and partita_selezionata in db_partite:
+                st.warning(f"Vuoi eliminare '{partita_selezionata}'?")
+                if st.button("🗑️ Conferma Elimina"):
+                    del db_partite[partita_selezionata]
+                    salva_dati_su_disco()
+                    st.success("Partita eliminata con successo!")
+                    st.rerun()
+            else:
+                st.info("Nessuna partita da eliminare.")
 
-    if partita_selezionata:
+    if db_partite and partita_selezionata in db_partite:
         p_info = db_partite[partita_selezionata]
         
-        # Assicura retrocompatibilità con vecchi salvataggi
         if "risultato" not in p_info: p_info["risultato"] = "N.D."
         if "casa_trasferta" not in p_info: p_info["casa_trasferta"] = "Casa"
 
@@ -480,7 +499,7 @@ elif menu == "📈 Riepilogo Squadra":
 
     st.divider()
     st.subheader("📊 Riepilogo Stagionale Giocatore")
-    giocatore_sel = st.selectbox("Seleziona Giocatore", list(db_giocatori.keys()))
+    giocatore_sel = st.selectbox("Seleziona Giocatore", list(db_giocatori.keys()) if db_giocatori else ["Nessun Giocatore"])
     
     storico_voti = []
     for p_nome, p_val in db_partite.items():
