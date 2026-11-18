@@ -470,7 +470,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
             
             if is_portiere:
                 current_vals = p_dati["dati_prestazione"].get(nome_g, {
-                    "minuti": 80, "parate": 0, "uscite": "0/1", "gol_subiti_resp": "0/0"
+                    "minuti": 80, "parate": 0, "uscite": "0/0", "gol_subiti_resp": "0/0"
                 })
                 c1, c2, c3, c4, c_voto = st.columns([1.5, 1.5, 1.5, 1.5, 1])
                 with c1:
@@ -491,7 +491,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 p_dati["dati_prestazione"][nome_g] = temp_dict
             else:
                 current_vals = p_dati["dati_prestazione"].get(nome_g, {
-                    "minuti": 80, "duelli": "5/5", "passaggi": 75, "perse": 0, "tiri": "0/0", "gol_fatti": 0
+                    "minuti": 80, "duelli": "0/0", "passaggi": 0, "perse": 0, "tiri": "0/0", "gol_fatti": 0
                 })
                 c1, c2, c3, c4, c5, c6, c_voto = st.columns([1, 1, 1, 0.8, 1, 0.8, 1])
                 with c1:
