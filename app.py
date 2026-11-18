@@ -20,7 +20,7 @@ except ImportError:
 # CONFIGURAZIONE PAGINA STREAMLIT
 # =====================================================================
 st.set_page_config(
-    page_title="USO NUVOLENTO UNDER 16 - Match Analysis & Formations",
+    page_title="ScoutAI - Match Analysis & Formations",
     page_icon="⚽",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -54,7 +54,6 @@ def carica_dati_da_disco():
             pass
     return None
 
-# Funzione di utilità per estrarre l'ID di YouTube da vari formati di link
 def estrai_youtube_id(url):
     if not url:
         return None
@@ -107,10 +106,10 @@ if dati_salvati:
 else:
     if "database_giocatori" not in st.session_state:
         st.session_state["database_giocatori"] = {
+            "Lorenzo": {"ruolo": "Portiere (POR)", "partite": {}},
             "Mattia": {"ruolo": "Difensore Centrale (DC)", "partite": {}},
             "Filippo": {"ruolo": "Centrocampista (CC)", "partite": {}},
             "Davide": {"ruolo": "Attaccante (ATT)", "partite": {}},
-            "Lorenzo": {"ruolo": "Portiere (POR)", "partite": {}},
             "Simone": {"ruolo": "Terzino (TS/TD)", "partite": {}},
             "Federico": {"ruolo": "Centrocampista (CC)", "partite": {}},
             "Alessandro": {"ruolo": "Attaccante (ATT)", "partite": {}},
@@ -118,8 +117,8 @@ else:
             "Marco": {"ruolo": "Esterno (EST)", "partite": {}},
             "Giovanni": {"ruolo": "Centrocampista (CC)", "partite": {}},
             "Tommaso": {"ruolo": "Attaccante (ATT)", "partite": {}},
+            "Pietro": {"ruolo": "Portiere (POR)", "partite": {}},
             "Riccardo": {"ruolo": "Riserva / Jolly", "partite": {}},
-            "Pietro": {"ruolo": "Riserva / Jolly", "partite": {}},
             "Edoardo": {"ruolo": "Riserva / Jolly", "partite": {}}
         }
     if "database_partite" not in st.session_state:
@@ -207,45 +206,63 @@ with col_title_h:
 st.divider()
 
 # =====================================================================
-# MOTORE DI CALCOLO VOTO & TREND
+# MOTORE DI CALCOLO VOTO & TREND (DISTINTO PORTIERE / MOVIMENTO)
 # =====================================================================
-def calcola_voto(p):
+def calcola_voto(p, is_portiere=False):
     try:
-        duelli_v, duelli_t = map(int, p.get('duelli', '0/0').split("/"))
-        salvataggi = int(p.get('salvataggi', 0))
-        pct_passaggi = float(p.get('passaggi', 75)) / 100.0
-        perse = int(p.get('perse', 0))
         minuti_giocati = int(p.get('minuti', 80))
-        tiri_porta, tiri_specchio = map(int, p.get('tiri', '0/0').split("/"))
+        fattore_tempo = minuti_giocati / 80.0 if minuti_giocati > 0 else 1.0
+        rating = 6.0
+
+        if is_portiere:
+            parate = int(p.get('parate', 0))
+            uscite_v, uscite_t = map(int, p.get('uscite', '0/0').split("/"))
+            gol_subiti, gol_resp = map(int, p.get('gol_subiti_resp', '0/0').split("/"))
+
+            rating += (parate * 0.4) * fattore_tempo
+            
+            pct_uscite = (uscite_v / uscite_t) if uscite_t > 0 else 0
+            if pct_uscite >= 0.75 and uscite_t >= 1:
+                rating += 0.3 * fattore_tempo
+            elif pct_uscite < 0.40 and uscite_t > 0:
+                rating -= 0.3 * fattore_tempo
+
+            rating -= (gol_subiti * 0.4) * fattore_tempo
+            rating -= (gol_resp * 1.0) * fattore_tempo
+        else:
+            duelli_v, duelli_t = map(int, p.get('duelli', '0/0').split("/"))
+            pct_passaggi = float(p.get('passaggi', 75)) / 100.0
+            perse = int(p.get('perse', 0))
+            tiri_porta, tiri_specchio = map(int, p.get('tiri', '0/0').split("/"))
+            gol_fatti = int(p.get('gol_fatti', 0))
+
+            pct_duelli = (duelli_v / duelli_t) if duelli_t > 0 else 0
+
+            if pct_duelli >= 0.75 and duelli_t >= 3:
+                rating += 0.4 * min(1.0, fattore_tempo + 0.2)
+            elif pct_duelli < 0.40:
+                rating -= 0.4 * fattore_tempo
+
+            if pct_passaggi >= 0.85:
+                rating += 0.3
+            elif pct_passaggi < 0.50:
+                rating -= 0.3 * fattore_tempo
+
+            if perse > 0:
+                rating -= (perse * 0.6) * fattore_tempo
+
+            if tiri_specchio > 0:
+                efficacia = tiri_porta / tiri_specchio
+                if efficacia >= 0.66:
+                    rating += 0.4 * fattore_tempo
+
+            # Bonus gol fatti (+1 per gol)
+            if gol_fatti > 0:
+                rating += (gol_fatti * 1.0)
+
+        return round(max(1.0, min(10.0, rating)), 1)
     except:
         return 6.0
-
-    fattore_tempo = minuti_giocati / 80.0 if minuti_giocati > 0 else 1.0
-    rating = 6.0
-    pct_duelli = (duelli_v / duelli_t) if duelli_t > 0 else 0
-
-    if pct_duelli >= 0.75 and duelli_t >= 3:
-        rating += 0.4 * min(1.0, fattore_tempo + 0.2)
-    elif pct_duelli < 0.40:
-        rating -= 0.4 * fattore_tempo
-
-    if salvataggi > 0:
-        rating += (salvataggi * 0.5) * fattore_tempo
-
-    if pct_passaggi >= 0.85:
-        rating += 0.3
-    elif pct_passaggi < 0.50:
-        rating -= 0.3 * fattore_tempo
-
-    if perse > 0:
-        rating -= (perse * 0.6) * fattore_tempo
-
-    if tiri_specchio > 0:
-        efficacia = tiri_porta / tiri_specchio
-        if efficacia >= 0.66:
-            rating += 0.4 * fattore_tempo
-
-    return round(max(1.0, min(10.0, rating)), 1)
 
 def calcola_trend_giocatore(storico_voti):
     if len(storico_voti) < 2:
@@ -276,15 +293,22 @@ def genera_pdf_partita(match_name, match_data, db_giocatori, accent_hex):
     elements.append(Paragraph(f"<b>Modulo:</b> {match_data['modulo']} | <b>Data:</b> {match_data['data']}", sub_style))
     elements.append(Spacer(1, 10))
 
-    t_data = [["N°", "Giocatore", "Ruolo", "Min.", "Duelli", "Pass.", "Tiri", "Voto"]]
+    t_data = [["N°", "Giocatore", "Ruolo", "Min.", "Statistiche Chiave", "Voto"]]
     for num, nome in match_data["formazione"].items():
         if not nome: continue
         p_dati = db_giocatori.get(nome, {}).get("partite", {}).get(match_name, {})
-        voto = calcola_voto(p_dati) if p_dati else "N.D."
-        ruolo = db_giocatori.get(nome, {}).get("ruolo", "Titolare" if int(num) <= 11 else "Riserva")
-        t_data.append([str(num), nome, ruolo, f"{p_dati.get('minuti', 80)}'", p_dati.get('duelli', '0/0'), f"{p_dati.get('passaggi', 75)}%", p_dati.get('tiri', '0/0'), str(voto)])
+        is_portiere = (str(num) in ["1", "12"])
+        voto = calcola_voto(p_dati, is_portiere) if p_dati else "N.D."
+        ruolo = db_giocatori.get(nome, {}).get("ruolo", "Portiere" if is_portiere else "Movimento")
+        
+        if is_portiere:
+            stats = f"Parate: {p_dati.get('parate', 0)} | Uscite: {p_dati.get('uscite', '0/0')} | Gol Sub./Resp.: {p_dati.get('gol_subiti_resp', '0/0')}"
+        else:
+            stats = f"Duelli: {p_dati.get('duelli', '0/0')} | Pass: {p_dati.get('passaggi', 75)}% | Gol: {p_dati.get('gol_fatti', 0)}"
 
-    t = Table(t_data, colWidths=[30, 110, 100, 45, 60, 50, 50, 45])
+        t_data.append([str(num), nome, ruolo, f"{p_dati.get('minuti', 80)}'", stats, str(voto)])
+
+    t = Table(t_data, colWidths=[30, 100, 90, 45, 230, 45])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.HexColor(accent_hex)),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -384,7 +408,7 @@ if menu == "📋 Setup Partite & Formazioni":
                 idx_mod = moduli_disponibili.index(p_info["modulo"]) if p_info["modulo"] in moduli_disponibili else 0
                 nuovo_modulo = st.selectbox("Modulo di Gioco", moduli_disponibili, index=idx_mod)
 
-            st.info("ℹ️ I numeri **1-11** rappresentano i titolari. I numeri **12-20** sono le riserve in panchina.")
+            st.info("ℹ️ I numeri **1** e **12** sono assegnati ai Portieri. I numeri **2-11** sono i titolari di movimento, e **13-20** le riserve.")
 
             nodi_rosa = [""] + list(db_giocatori.keys())
 
@@ -394,7 +418,8 @@ if menu == "📋 Setup Partite & Formazioni":
                 with cols_tit[(i-1) % 4]:
                     curr_val = p_info["formazione"].get(str(i), p_info["formazione"].get(i, ""))
                     idx_val = nodi_rosa.index(curr_val) if curr_val in nodi_rosa else 0
-                    p_info["formazione"][str(i)] = st.selectbox(f"N° {i} (Titolare)", nodi_rosa, index=idx_val, key=f"tit_{i}_{partita_selezionata}")
+                    label_ruolo = "PORTIERE" if i == 1 else "Titolare"
+                    p_info["formazione"][str(i)] = st.selectbox(f"N° {i} ({label_ruolo})", nodi_rosa, index=idx_val, key=f"tit_{i}_{partita_selezionata}")
 
             st.markdown("### 🔵 Riserve / Panchina (Maglie 12 - 20)")
             cols_res = st.columns(3)
@@ -402,7 +427,8 @@ if menu == "📋 Setup Partite & Formazioni":
                 with cols_res[(i-12) % 3]:
                     curr_val = p_info["formazione"].get(str(i), p_info["formazione"].get(i, ""))
                     idx_val = nodi_rosa.index(curr_val) if curr_val in nodi_rosa else 0
-                    p_info["formazione"][str(i)] = st.selectbox(f"N° {i} (Riserva)", nodi_rosa, index=idx_val, key=f"res_{i}_{partita_selezionata}")
+                    label_ruolo = "PORTIERE RIS." if i == 12 else "Riserva"
+                    p_info["formazione"][str(i)] = st.selectbox(f"N° {i} ({label_ruolo})", nodi_rosa, index=idx_val, key=f"res_{i}_{partita_selezionata}")
 
             if st.form_submit_button("Conferma e Salva Dati Partita"):
                 p_info["avversario"] = nuovo_avv
@@ -414,7 +440,7 @@ if menu == "📋 Setup Partite & Formazioni":
                 st.rerun()
 
 # =====================================================================
-# 2. INSERIMENTO PARAMETRI & VOTI
+# 2. INSERIMENTO PARAMETRI & VOTI (PORTIERE VS MOVIMENTO)
 # =====================================================================
 elif menu == "⚡ Inserimento Parametri & Voti":
     st.title("⚡ Inserimento Parametri Post-Partita & Voti")
@@ -432,39 +458,66 @@ elif menu == "⚡ Inserimento Parametri & Voti":
         p_dati["dati_prestazione"] = {}
 
     with st.form("form_inserimento_parametri"):
-        passaggi_opt = [100, 75, 50, 25, 10, 0]
+        passaggi_opt = [100, 75, 50, 25, 10]
         
         st.markdown("### 🔴 TITOLARI (Maglie 1 - 11)")
         for i in range(1, 12):
             nome_g = p_dati["formazione"].get(str(i), p_dati["formazione"].get(i, ""))
             if not nome_g: continue
             
-            st.markdown(f"**N° {i} — {nome_g}**")
-            current_vals = p_dati["dati_prestazione"].get(nome_g, {
-                "minuti": 80, "duelli": "0/0", "passaggi": 0, "perse": 0, "tiri": "0/0", "salvataggi": 0
-            })
+            is_portiere = (i == 1)
+            role_label = "🥅 PORTIERE" : "🏃‍♂️ GIOCATORE DI MOVIMENTO"
+            st.markdown(f"**N° {i} — {nome_g}** *({ 'PORTIERE' if is_portiere else 'MOVIMENTO' })*")
             
-            c1, c2, c3, c4, c5, c_voto = st.columns([1.2, 1.2, 1.2, 1, 1.2, 1])
-            with c1:
-                minuti = st.number_input("Minuti", 1, 80, int(current_vals.get("minuti", 80)), key=f"min_{i}")
-            with c2:
-                duelli = st.text_input("Duelli V/T", str(current_vals.get("duelli", "5/5")), key=f"due_{i}")
-            with c3:
-                val_pass = int(current_vals.get("passaggi", 75))
-                idx_pass = passaggi_opt.index(val_pass) if val_pass in passaggi_opt else 1
-                passaggi = st.selectbox("Passaggi %", passaggi_opt, index=idx_pass, key=f"pas_{i}")
-            with c4:
-                perse = st.number_input("Perse", 0, 10, int(current_vals.get("perse", 0)), key=f"per_{i}")
-            with c5:
-                tiri = st.text_input("Tiri P/Sp", str(current_vals.get("tiri", "0/0")), key=f"tir_{i}")
-            
-            temp_dict = {"minuti": minuti, "duelli": duelli, "passaggi": passaggi, "perse": perse, "tiri": tiri, "salvataggi": 0}
-            voto_live = calcola_voto(temp_dict)
-            
-            with c_voto:
-                st.markdown(f"<div style='background-color: #1e2230; border: 1px solid {tema['accent']}; padding: 8px; border-radius: 8px; text-align: center; margin-top: 24px;'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {tema['accent']};'>{voto_live}</span></div>", unsafe_allow_html=True)
+            if is_portiere:
+                current_vals = p_dati["dati_prestazione"].get(nome_g, {
+                    "minuti": 80, "parate": 0, "uscite": "0/1", "gol_subiti_resp": "0/0"
+                })
+                c1, c2, c3, c4, c_voto = st.columns([1.5, 1.5, 1.5, 1.5, 1])
+                with c1:
+                    minuti = st.number_input("Minuti", 1, 80, int(current_vals.get("minuti", 80)), key=f"min_{i}")
+                with c2:
+                    parate = st.number_input("Parate", 0, 20, int(current_vals.get("parate", 0)), key=f"par_{i}")
+                with c3:
+                    uscite = st.text_input("Uscite tent./rius.", str(current_vals.get("uscite", "0/1")), key=f"usc_{i}")
+                with c4:
+                    gol_subiti_resp = st.text_input("Gol sub./resp.", str(current_vals.get("gol_subiti_resp", "0/0")), key=f"gol_sub_{i}")
+                
+                temp_dict = {"minuti": minuti, "parate": parate, "uscite": uscite, "gol_subiti_resp": gol_subiti_resp}
+                voto_live = calcola_voto(temp_dict, is_portiere=True)
+                
+                with c_voto:
+                    st.markdown(f"<div style='background-color: #1e2230; border: 1px solid {tema['accent']}; padding: 8px; border-radius: 8px; text-align: center; margin-top: 24px;'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {tema['accent']};'>{voto_live}</span></div>", unsafe_allow_html=True)
 
-            p_dati["dati_prestazione"][nome_g] = temp_dict
+                p_dati["dati_prestazione"][nome_g] = temp_dict
+            else:
+                current_vals = p_dati["dati_prestazione"].get(nome_g, {
+                    "minuti": 80, "duelli": "5/5", "passaggi": 75, "perse": 0, "tiri": "0/0", "gol_fatti": 0
+                })
+                c1, c2, c3, c4, c5, c6, c_voto = st.columns([1, 1, 1, 0.8, 1, 0.8, 1])
+                with c1:
+                    minuti = st.number_input("Minuti", 1, 80, int(current_vals.get("minuti", 80)), key=f"min_{i}")
+                with c2:
+                    duelli = st.text_input("Duelli V/T", str(current_vals.get("duelli", "5/5")), key=f"due_{i}")
+                with c3:
+                    val_pass = int(current_vals.get("passaggi", 75))
+                    idx_pass = passaggi_opt.index(val_pass) if val_pass in passaggi_opt else 1
+                    passaggi = st.selectbox("Pass %", passaggi_opt, index=idx_pass, key=f"pas_{i}")
+                with c4:
+                    perse = st.number_input("Perse", 0, 10, int(current_vals.get("perse", 0)), key=f"per_{i}")
+                with c5:
+                    tiri = st.text_input("Tiri P/Sp", str(current_vals.get("tiri", "0/0")), key=f"tir_{i}")
+                with c6:
+                    gol_fatti = st.number_input("Gol", 0, 5, int(current_vals.get("gol_fatti", 0)), key=f"gol_{i}")
+                
+                temp_dict = {"minuti": minuti, "duelli": duelli, "passaggi": passaggi, "perse": perse, "tiri": tiri, "gol_fatti": gol_fatti, "salvataggi": 0}
+                voto_live = calcola_voto(temp_dict, is_portiere=False)
+                
+                with c_voto:
+                    st.markdown(f"<div style='background-color: #1e2230; border: 1px solid {tema['accent']}; padding: 8px; border-radius: 8px; text-align: center; margin-top: 24px;'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {tema['accent']};'>{voto_live}</span></div>", unsafe_allow_html=True)
+
+                p_dati["dati_prestazione"][nome_g] = temp_dict
+
             st.markdown("---")
 
         st.markdown("<br><hr style='border: 2px dashed #10b981;'><br>", unsafe_allow_html=True)
@@ -474,32 +527,58 @@ elif menu == "⚡ Inserimento Parametri & Voti":
             nome_g = p_dati["formazione"].get(str(i), p_dati["formazione"].get(i, ""))
             if not nome_g: continue
             
-            st.markdown(f"**N° {i} — {nome_g} (Riserva)**")
-            current_vals = p_dati["dati_prestazione"].get(nome_g, {
-                "minuti": 0, "duelli": "0/0", "passaggi": 0, "perse": 0, "tiri": "0/0", "salvataggi": 0
-            })
+            is_portiere = (i == 12)
+            st.markdown(f"**N° {i} — {nome_g} (Riserva)** *({ 'PORTIERE' if is_portiere else 'MOVIMENTO' })*")
             
-            c1, c2, c3, c4, c5, c_voto = st.columns([1.2, 1.2, 1.2, 1, 1.2, 1])
-            with c1:
-                minuti = st.number_input("Min sub", 0, 80, int(current_vals.get("minuti", 0)), key=f"min_res_{i}")
-            with c2:
-                duelli = st.text_input("Duelli V/T", str(current_vals.get("duelli", "0/0")), key=f"due_res_{i}")
-            with c3:
-                val_pass_res = int(current_vals.get("passaggi", 75))
-                idx_pass_res = passaggi_opt.index(val_pass_res) if val_pass_res in passaggi_opt else 1
-                passaggi = st.selectbox("Passaggi %", passaggi_opt, index=idx_pass_res, key=f"pas_res_{i}")
-            with c4:
-                perse = st.number_input("Perse", 0, 10, int(current_vals.get("perse", 0)), key=f"per_res_{i}")
-            with c5:
-                tiri = st.text_input("Tiri P/Sp", str(current_vals.get("tiri", "0/0")), key=f"tir_res_{i}")
-            
-            temp_dict_res = {"minuti": minuti, "duelli": duelli, "passaggi": passaggi, "perse": perse, "tiri": tiri, "salvataggi": 0}
-            voto_live_res = calcola_voto(temp_dict_res)
-            
-            with c_voto:
-                st.markdown(f"<div style='background-color: #1e2230; border: 1px solid {tema['accent']}; padding: 8px; border-radius: 8px; text-align: center; margin-top: 24px;'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {tema['accent']};'>{voto_live_res}</span></div>", unsafe_allow_html=True)
+            if is_portiere:
+                current_vals = p_dati["dati_prestazione"].get(nome_g, {
+                    "minuti": 0, "parate": 0, "uscite": "0/0", "gol_subiti_resp": "0/0"
+                })
+                c1, c2, c3, c4, c_voto = st.columns([1.5, 1.5, 1.5, 1.5, 1])
+                with c1:
+                    minuti = st.number_input("Min sub", 0, 80, int(current_vals.get("minuti", 0)), key=f"min_res_{i}")
+                with c2:
+                    parate = st.number_input("Parate", 0, 20, int(current_vals.get("parate", 0)), key=f"par_res_{i}")
+                with c3:
+                    uscite = st.text_input("Uscite tent./rius.", str(current_vals.get("uscite", "0/0")), key=f"usc_res_{i}")
+                with c4:
+                    gol_subiti_resp = st.text_input("Gol sub./resp.", str(current_vals.get("gol_subiti_resp", "0/0")), key=f"gol_sub_res_{i}")
+                
+                temp_dict_res = {"minuti": minuti, "parate": parate, "uscite": uscite, "gol_subiti_resp": gol_subiti_resp}
+                voto_live_res = calcola_voto(temp_dict_res, is_portiere=True)
+                
+                with c_voto:
+                    st.markdown(f"<div style='background-color: #1e2230; border: 1px solid {tema['accent']}; padding: 8px; border-radius: 8px; text-align: center; margin-top: 24px;'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {tema['accent']};'>{voto_live_res}</span></div>", unsafe_allow_html=True)
 
-            p_dati["dati_prestazione"][nome_g] = temp_dict_res
+                p_dati["dati_prestazione"][nome_g] = temp_dict_res
+            else:
+                current_vals = p_dati["dati_prestazione"].get(nome_g, {
+                    "minuti": 0, "duelli": "0/0", "passaggi": 75, "perse": 0, "tiri": "0/0", "gol_fatti": 0
+                })
+                c1, c2, c3, c4, c5, c6, c_voto = st.columns([1, 1, 1, 0.8, 1, 0.8, 1])
+                with c1:
+                    minuti = st.number_input("Min sub", 0, 80, int(current_vals.get("minuti", 0)), key=f"min_res_{i}")
+                with c2:
+                    duelli = st.text_input("Duelli V/T", str(current_vals.get("duelli", "0/0")), key=f"due_res_{i}")
+                with c3:
+                    val_pass_res = int(current_vals.get("passaggi", 75))
+                    idx_pass_res = passaggi_opt.index(val_pass_res) if val_pass_res in passaggi_opt else 1
+                    passaggi = st.selectbox("Pass %", passaggi_opt, index=idx_pass_res, key=f"pas_res_{i}")
+                with c4:
+                    perse = st.number_input("Perse", 0, 10, int(current_vals.get("perse", 0)), key=f"per_res_{i}")
+                with c5:
+                    tiri = st.text_input("Tiri P/Sp", str(current_vals.get("tiri", "0/0")), key=f"tir_res_{i}")
+                with c6:
+                    gol_fatti = st.number_input("Gol", 0, 5, int(current_vals.get("gol_fatti", 0)), key=f"gol_res_{i}")
+                
+                temp_dict_res = {"minuti": minuti, "duelli": duelli, "passaggi": passaggi, "perse": perse, "tiri": tiri, "gol_fatti": gol_fatti, "salvataggi": 0}
+                voto_live_res = calcola_voto(temp_dict_res, is_portiere=False)
+                
+                with c_voto:
+                    st.markdown(f"<div style='background-color: #1e2230; border: 1px solid {tema['accent']}; padding: 8px; border-radius: 8px; text-align: center; margin-top: 24px;'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {tema['accent']};'>{voto_live_res}</span></div>", unsafe_allow_html=True)
+
+                p_dati["dati_prestazione"][nome_g] = temp_dict_res
+
             st.markdown("---")
 
         if st.form_submit_button("💾 Salva Parametri e Calcola Voti"):
@@ -520,10 +599,16 @@ elif menu == "⚡ Inserimento Parametri & Voti":
         else:
             st.info("ℹ️ Modulo PDF disabilitato (ReportLab non installato nell'ambiente). Puoi usare l'export CSV.")
     with col_csv:
-        df_match = pd.DataFrame([
-            {"Giocatore": n, **p_dati["dati_prestazione"][n], "Voto": calcola_voto(p_dati["dati_prestazione"][n])}
-            for n in p_dati["dati_prestazione"]
-        ])
+        # Determina il ruolo di ciascuno in base alla formazione attuale per il CSV
+        righe_csv = []
+        for n, nome in p_dati["formazione"].items():
+            if not nome: continue
+            is_portiere = (str(n) in ["1", "12"])
+            p_dati_g = p_dati["dati_prestazione"].get(nome, {})
+            voto = calcola_voto(p_dati_g, is_portiere)
+            righe_csv.append({"Numero": n, "Giocatore": nome, **p_dati_g, "Voto": voto})
+        
+        df_match = pd.DataFrame(righe_csv)
         if not df_match.empty:
             csv_data = df_match.to_csv(index=False).encode('utf-8')
             st.download_button("📊 Esporta CSV Match", csv_data, file_name=f"Match_{partita_sel}.csv", mime="text/csv")
@@ -538,7 +623,6 @@ elif menu == "🎥 Video Analisi":
         st.warning("⚠️ Crea prima una partita nella sezione 'Setup Partite & Formazioni'.")
         st.stop()
 
-    # Selezione Partita
     partita_sel = st.selectbox("Seleziona Partita per la Video Analisi", list(db_partite.keys()), key="video_partita")
     p_info = db_partite[partita_sel]
 
@@ -547,7 +631,6 @@ elif menu == "🎥 Video Analisi":
 
     st.divider()
 
-    # Header info partita in alto (Data, Risultato, Casa/Trasferta)
     col_info1, col_info2, col_info3, col_info4 = st.columns(4)
     col_info1.metric("Data Partita", p_info.get("data", "N.D."))
     col_info2.metric("Risultato", p_info.get("risultato", "N.D."))
@@ -556,14 +639,12 @@ elif menu == "🎥 Video Analisi":
 
     st.divider()
 
-    # Layout a due colonne: Sinistra (Input link e pulsante Play), Destra (Main Frame Video)
     col_input_l, col_video_r = st.columns([1.2, 1.8])
 
     with col_input_l:
         st.subheader("🔗 Configurazione Link")
         link_inserito = st.text_input("Inserisci Link YouTube", value=p_info.get("youtube_link", ""), placeholder="https://www.youtube.com/watch?v=...")
         
-        # Pulsante Play / Salva Link
         if st.button("▶️ Play Video", use_container_width=True):
             p_info["youtube_link"] = link_inserito
             salva_dati_su_disco()
@@ -571,10 +652,10 @@ elif menu == "🎥 Video Analisi":
             st.rerun()
 
         st.markdown("<br>", unsafe_allow_html=True)
-        st.info("💡 **Istruzioni:** Incolla il link del video di YouTube (intero match o clip di analisi) e clicca su **Play Video** per caricarlo nel player a destra.")
+        st.info("💡 **Istruzioni:** Incolla il link del video di YouTube e clicca su **Play Video** per caricarlo nel player a destra.")
 
     with col_video_r:
-        st.subheader("📺 Analisi video")
+        st.subheader("📺 Main Frame Video")
         link_corrente = p_info.get("youtube_link", "")
         yt_id = estrai_youtube_id(link_corrente)
 
@@ -606,7 +687,14 @@ elif menu == "📈 Riepilogo Squadra":
     st.subheader("🏆 Elenco Partite & Voti Medi Squadra")
     partite_riepilogo = []
     for p_nome, p_val in db_partite.items():
-        voti_match = [calcola_voto(d) for d in p_val.get("dati_prestazione", {}).values()]
+        voti_match = []
+        for n, nome in p_val.get("formazione", {}).items():
+            if not nome: continue
+            is_portiere = (str(n) in ["1", "12"])
+            d_p = p_val.get("dati_prestazione", {}).get(nome, {})
+            if d_p:
+                voti_match.append(calcola_voto(d_p, is_portiere))
+        
         voto_medio = round(sum(voti_match)/len(voti_match), 1) if voti_match else 6.0
         partite_riepilogo.append({
             "Partita": p_nome, 
@@ -626,8 +714,14 @@ elif menu == "📈 Riepilogo Squadra":
     
     storico_voti = []
     for p_nome, p_val in db_partite.items():
-        if giocatore_sel in p_val.get("dati_prestazione", {}):
-            storico_voti.append(calcola_voto(p_val["dati_prestazione"][giocatore_sel]))
+        formazione = p_val.get("formazione", {})
+        # Trova se il giocatore era in campo e con quale numero in questa partita
+        for n, nome in formazione.items():
+            if nome == giocatore_sel:
+                is_portiere = (str(n) in ["1", "12"])
+                d_p = p_val.get("dati_prestazione", {}).get(giocatore_sel, {})
+                if d_p:
+                    storico_voti.append(calcola_voto(d_p, is_portiere))
 
     media_stagione = round(sum(storico_voti)/len(storico_voti), 1) if storico_voti else 6.0
     trend = calcola_trend_giocatore(storico_voti)
@@ -648,7 +742,7 @@ elif menu == "👤 Gestione Rosa":
     with col_dl:
         df_template = pd.DataFrame({
             "Nome": ["Mario Rossi", "Luigi Bianchi"],
-            "Ruolo": ["Difensore Centrale (DC)", "Centrocampista (CC)"]
+            "Ruolo": ["Difensore Centrale (DC)", "Portiere (POR)"]
         })
         csv_template = df_template.to_csv(index=False).encode('utf-8')
         st.download_button(
