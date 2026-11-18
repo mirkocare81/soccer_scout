@@ -5,6 +5,7 @@ import time
 import os
 import json
 import re
+from datetime import datetime
 
 # Import protetto di ReportLab (se non installato, l'app non va in crash)
 try:
@@ -68,6 +69,15 @@ def estrai_youtube_id(url):
     if len(url) == 11:
         return url
     return None
+
+def parse_data_partita(data_str):
+    """Converte una stringa data in oggetto datetime per ordinamento sicuro (fallback a data odierna se non parsabile)"""
+    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(data_str.strip(), fmt)
+        except ValueError:
+            continue
+    return datetime.min
 
 # =====================================================================
 # INIZIALIZZAZIONE STATO TEMA & DATABASE
@@ -340,7 +350,7 @@ menu = st.sidebar.radio("Navigazione", [
 ])
 
 # =====================================================================
-# 1. SETUP PARTITE & FORMAZIONI
+# 1. SETUP PARTITE & FORMAZIONI (CON FILTRAGGIO GIOCATORI DUPLICATI)
 # =====================================================================
 if menu == "📋 Setup Partite & Formazioni":
     st.title("📋 Setup Partite & Formazioni Titolari / Riserve")
@@ -408,27 +418,52 @@ if menu == "📋 Setup Partite & Formazioni":
                 idx_mod = moduli_disponibili.index(p_info["modulo"]) if p_info["modulo"] in moduli_disponibili else 0
                 nuovo_modulo = st.selectbox("Modulo di Gioco", moduli_disponibili, index=idx_mod)
 
-            st.info("ℹ️ I numeri **1** e **12** sono assegnati ai Portieri. I numeri **2-11** sono i titolari di movimento, e **13-20** le riserve.")
+            st.info("ℹ️ I numeri **1** e **12** sono assegnati ai Portieri. I giocatori già inseriti in formazione vengono automaticamente esclusi dalle tendine per evitare duplicati.")
 
-            nodi_rosa = [""] + list(db_giocatori.keys())
+            # Raccogliamo l'intera rosa disponibile
+            tutta_rosa = list(db_giocatori.keys())
 
             st.markdown("### 🔴 Titolari (Maglie 1 - 11)")
             cols_tit = st.columns(4)
+            
+            # Salviamo temporaneamente le selezioni correnti per calcolare i disponibili
+            formazione_corrente = p_info.get("formazione", {})
+            
             for i in range(1, 12):
                 with cols_tit[(i-1) % 4]:
-                    curr_val = p_info["formazione"].get(str(i), p_info["formazione"].get(i, ""))
-                    idx_val = nodi_rosa.index(curr_val) if curr_val in nodi_rosa else 0
+                    curr_val = formazione_corrente.get(str(i), formazione_corrente.get(i, ""))
+                    
+                    # Calcoliamo i giocatori già selezionati in ALTRI slot di questa partita
+                    selezionati_altrove = [
+                        val for k, val in formazione_corrente.items() 
+                        if str(k) != str(i) and val != ""
+                    ]
+                    
+                    # Disponibili per questo slot: opzione vuota + rosa tranne quelli già scelti altrove
+                    opzioni_slot = [""] + [g for g in tutta_rosa if g not in selezionati_altrove or g == curr_val]
+                    
+                    idx_val = opzioni_slot.index(curr_val) if curr_val in opzioni_slot else 0
                     label_ruolo = "PORTIERE" if i == 1 else "Titolare"
-                    p_info["formazione"][str(i)] = st.selectbox(f"N° {i} ({label_ruolo})", nodi_rosa, index=idx_val, key=f"tit_{i}_{partita_selezionata}")
+                    
+                    p_info["formazione"][str(i)] = st.selectbox(f"N° {i} ({label_ruolo})", opzioni_slot, index=idx_val, key=f"tit_{i}_{partita_selezionata}")
 
             st.markdown("### 🔵 Riserve / Panchina (Maglie 12 - 20)")
             cols_res = st.columns(3)
             for i in range(12, 21):
                 with cols_res[(i-12) % 3]:
-                    curr_val = p_info["formazione"].get(str(i), p_info["formazione"].get(i, ""))
-                    idx_val = nodi_rosa.index(curr_val) if curr_val in nodi_rosa else 0
+                    curr_val = formazione_corrente.get(str(i), formazione_corrente.get(i, ""))
+                    
+                    selezionati_altrove = [
+                        val for k, val in formazione_corrente.items() 
+                        if str(k) != str(i) and val != ""
+                    ]
+                    
+                    opzioni_slot = [""] + [g for g in tutta_rosa if g not in selezionati_altrove or g == curr_val]
+                    
+                    idx_val = opzioni_slot.index(curr_val) if curr_val in opzioni_slot else 0
                     label_ruolo = "PORTIERE RIS." if i == 12 else "Riserva"
-                    p_info["formazione"][str(i)] = st.selectbox(f"N° {i} ({label_ruolo})", nodi_rosa, index=idx_val, key=f"res_{i}_{partita_selezionata}")
+                    
+                    p_info["formazione"][str(i)] = st.selectbox(f"N° {i} ({label_ruolo})", opzioni_slot, index=idx_val, key=f"res_{i}_{partita_selezionata}")
 
             if st.form_submit_button("Conferma e Salva Dati Partita"):
                 p_info["avversario"] = nuovo_avv
@@ -679,14 +714,21 @@ elif menu == "🎥 Video Analisi":
             """, unsafe_allow_html=True)
 
 # =====================================================================
-# 4. RIEPILOGO SQUADRA & GIOCATORI
+# 4. RIEPILOGO SQUADRA & GIOCATORI (ORDINAMENTO CRONOLOGICO PARTITE)
 # =====================================================================
 elif menu == "📈 Riepilogo Squadra":
     st.title("📈 Riepilogo Squadra & Statistiche Stagionali")
 
-    st.subheader("🏆 Elenco Partite & Voti Medi Squadra")
+    st.subheader("🏆 Elenco Partite & Voti Medi Squadra (Dal più vecchio al più recente)")
+    
+    # Ordiniamo le partite cronologicamente in base alla data estratta
+    partite_ordinate = sorted(
+        db_partite.items(),
+        key=lambda item: parse_data_partita(item[1].get("data", "01/01/2026"))
+    )
+
     partite_riepilogo = []
-    for p_nome, p_val in db_partite.items():
+    for p_nome, p_val in partite_ordinate:
         voti_match = []
         for n, nome in p_val.get("formazione", {}).items():
             if not nome: continue
@@ -726,7 +768,6 @@ elif menu == "📈 Riepilogo Squadra":
                     min_giocati = int(d_p.get("minuti", 0))
                     num_maglia = int(n) if str(n).isdigit() else 0
 
-                    # Controllo se ha giocato almeno 1 minuto
                     if min_giocati > 0:
                         is_portiere = (str(n) in ["1", "12"])
                         storico_voti.append(calcola_voto(d_p, is_portiere))
@@ -741,7 +782,6 @@ elif menu == "📈 Riepilogo Squadra":
     media_stagione = round(sum(storico_voti)/len(storico_voti), 1) if storico_voti else 6.0
     trend = calcola_trend_giocatore(storico_voti)
 
-    # Metriche generali
     c1, c2, c3 = st.columns(3)
     c1.metric("Partite Votate", len(storico_voti))
     c2.metric("Media Voto Stagionale", f"{media_stagione} / 10")
@@ -749,7 +789,6 @@ elif menu == "📈 Riepilogo Squadra":
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # Box dettagliato presenze e minuti
     st.markdown(f"""
     <div style="background-color: {tema['bg_card']}; border: 1px solid {tema['border_color']}; border-radius: {tema['border_radius']}px; padding: 20px; box-shadow: 0 6px 14px rgba(0,0,0,{ombra_alfa});">
         <h4 style="margin-top: 0; color: {tema['accent']}; border-bottom: 1px solid {tema['border_color']}; padding-bottom: 10px;">📋 Dettaglio Presenze & Minutaggio: {giocatore_sel}</h4>
