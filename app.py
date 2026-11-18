@@ -256,7 +256,6 @@ def calcola_voto(p, is_portiere=False):
                 if efficacia >= 0.66:
                     rating += 0.4 * fattore_tempo
 
-            # Bonus gol fatti (+1 per gol)
             if gol_fatti > 0:
                 rating += (gol_fatti * 1.0)
 
@@ -466,8 +465,8 @@ elif menu == "⚡ Inserimento Parametri & Voti":
             if not nome_g: continue
             
             is_portiere = (i == 1)
-            role_label = "🥅 PORTIERE" : "🏃‍♂️ GIOCATORE DI MOVIMENTO"
-            st.markdown(f"**N° {i} — {nome_g}** *({ 'PORTIERE' if is_portiere else 'MOVIMENTO' })*")
+            role_text = "PORTIERE" if is_portiere else "MOVIMENTO"
+            st.markdown(f"**N° {i} — {nome_g}** *({role_text})*")
             
             if is_portiere:
                 current_vals = p_dati["dati_prestazione"].get(nome_g, {
@@ -528,7 +527,8 @@ elif menu == "⚡ Inserimento Parametri & Voti":
             if not nome_g: continue
             
             is_portiere = (i == 12)
-            st.markdown(f"**N° {i} — {nome_g} (Riserva)** *({ 'PORTIERE' if is_portiere else 'MOVIMENTO' })*")
+            role_text_res = "PORTIERE" if is_portiere else "MOVIMENTO"
+            st.markdown(f"**N° {i} — {nome_g} (Riserva)** *({role_text_res})*")
             
             if is_portiere:
                 current_vals = p_dati["dati_prestazione"].get(nome_g, {
@@ -599,7 +599,6 @@ elif menu == "⚡ Inserimento Parametri & Voti":
         else:
             st.info("ℹ️ Modulo PDF disabilitato (ReportLab non installato nell'ambiente). Puoi usare l'export CSV.")
     with col_csv:
-        # Determina il ruolo di ciascuno in base alla formazione attuale per il CSV
         righe_csv = []
         for n, nome in p_dati["formazione"].items():
             if not nome: continue
@@ -715,7 +714,6 @@ elif menu == "📈 Riepilogo Squadra":
     storico_voti = []
     for p_nome, p_val in db_partite.items():
         formazione = p_val.get("formazione", {})
-        # Trova se il giocatore era in campo e con quale numero in questa partita
         for n, nome in formazione.items():
             if nome == giocatore_sel:
                 is_portiere = (str(n) in ["1", "12"])
