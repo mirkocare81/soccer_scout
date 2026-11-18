@@ -349,15 +349,23 @@ menu = st.sidebar.radio("Navigazione", [
     "🎨 Editor Grafica"
 ])
 
+# Lista partite ordinata cronologicamente (dal più vecchio al più recente)
+partite_ordinate_chiavi = [
+    item[0] for item in sorted(
+        db_partite.items(),
+        key=lambda x: parse_data_partita(x[1].get("data", "01/01/2026"))
+    )
+]
+
 # =====================================================================
-# 1. SETUP PARTITE & FORMAZIONI (CON FILTRAGGIO GIOCATORI DUPLICATI)
+# 1. SETUP PARTITE & FORMAZIONI (ORDINATO CRONOLOGICAMENTE)
 # =====================================================================
 if menu == "📋 Setup Partite & Formazioni":
     st.title("📋 Setup Partite & Formazioni Titolari / Riserve")
 
     col_sel_p, col_new_p, col_del_p = st.columns([3, 0.4, 0.4])
     with col_sel_p:
-        partita_selezionata = st.selectbox("Seleziona Partita", list(db_partite.keys()) if db_partite else ["Nessuna Partita"])
+        partita_selezionata = st.selectbox("Seleziona Partita", partite_ordinate_chiavi if partite_ordinate_chiavi else ["Nessuna Partita"])
     with col_new_p:
         st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
         with st.expander("➕"):
@@ -420,31 +428,21 @@ if menu == "📋 Setup Partite & Formazioni":
 
             st.info("ℹ️ I numeri **1** e **12** sono assegnati ai Portieri. I giocatori già inseriti in formazione vengono automaticamente esclusi dalle tendine per evitare duplicati.")
 
-            # Raccogliamo l'intera rosa disponibile
             tutta_rosa = list(db_giocatori.keys())
+            formazione_corrente = p_info.get("formazione", {})
 
             st.markdown("### 🔴 Titolari (Maglie 1 - 11)")
             cols_tit = st.columns(4)
-            
-            # Salviamo temporaneamente le selezioni correnti per calcolare i disponibili
-            formazione_corrente = p_info.get("formazione", {})
-            
             for i in range(1, 12):
                 with cols_tit[(i-1) % 4]:
                     curr_val = formazione_corrente.get(str(i), formazione_corrente.get(i, ""))
-                    
-                    # Calcoliamo i giocatori già selezionati in ALTRI slot di questa partita
                     selezionati_altrove = [
                         val for k, val in formazione_corrente.items() 
                         if str(k) != str(i) and val != ""
                     ]
-                    
-                    # Disponibili per questo slot: opzione vuota + rosa tranne quelli già scelti altrove
                     opzioni_slot = [""] + [g for g in tutta_rosa if g not in selezionati_altrove or g == curr_val]
-                    
                     idx_val = opzioni_slot.index(curr_val) if curr_val in opzioni_slot else 0
                     label_ruolo = "PORTIERE" if i == 1 else "Titolare"
-                    
                     p_info["formazione"][str(i)] = st.selectbox(f"N° {i} ({label_ruolo})", opzioni_slot, index=idx_val, key=f"tit_{i}_{partita_selezionata}")
 
             st.markdown("### 🔵 Riserve / Panchina (Maglie 12 - 20)")
@@ -452,17 +450,13 @@ if menu == "📋 Setup Partite & Formazioni":
             for i in range(12, 21):
                 with cols_res[(i-12) % 3]:
                     curr_val = formazione_corrente.get(str(i), formazione_corrente.get(i, ""))
-                    
                     selezionati_altrove = [
                         val for k, val in formazione_corrente.items() 
                         if str(k) != str(i) and val != ""
                     ]
-                    
                     opzioni_slot = [""] + [g for g in tutta_rosa if g not in selezionati_altrove or g == curr_val]
-                    
                     idx_val = opzioni_slot.index(curr_val) if curr_val in opzioni_slot else 0
                     label_ruolo = "PORTIERE RIS." if i == 12 else "Riserva"
-                    
                     p_info["formazione"][str(i)] = st.selectbox(f"N° {i} ({label_ruolo})", opzioni_slot, index=idx_val, key=f"res_{i}_{partita_selezionata}")
 
             if st.form_submit_button("Conferma e Salva Dati Partita"):
@@ -484,7 +478,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
         st.warning("⚠️ Crea prima una partita nella sezione 'Setup Partite & Formazioni'.")
         st.stop()
 
-    partita_sel = st.selectbox("Seleziona Partita da Analizzare", list(db_partite.keys()), key="analizza_partita")
+    partita_sel = st.selectbox("Seleziona Partita da Analizzare", partite_ordinate_chiavi, key="analizza_partita")
     p_dati = db_partite[partita_sel]
 
     if "dati_prestazione" not in p_dati:
@@ -658,7 +652,7 @@ elif menu == "🎥 Video Analisi":
         st.warning("⚠️ Crea prima una partita nella sezione 'Setup Partite & Formazioni'.")
         st.stop()
 
-    partita_sel = st.selectbox("Seleziona Partita per la Video Analisi", list(db_partite.keys()), key="video_partita")
+    partita_sel = st.selectbox("Seleziona Partita per la Video Analisi", partite_ordinate_chiavi, key="video_partita")
     p_info = db_partite[partita_sel]
 
     if "youtube_link" not in p_info:
@@ -714,14 +708,13 @@ elif menu == "🎥 Video Analisi":
             """, unsafe_allow_html=True)
 
 # =====================================================================
-# 4. RIEPILOGO SQUADRA & GIOCATORI (ORDINAMENTO CRONOLOGICO PARTITE)
+# 4. RIEPILOGO SQUADRA & GIOCATORI
 # =====================================================================
 elif menu == "📈 Riepilogo Squadra":
     st.title("📈 Riepilogo Squadra & Statistiche Stagionali")
 
     st.subheader("🏆 Elenco Partite & Voti Medi Squadra (Dal più vecchio al più recente)")
     
-    # Ordiniamo le partite cronologicamente in base alla data estratta
     partite_ordinate = sorted(
         db_partite.items(),
         key=lambda item: parse_data_partita(item[1].get("data", "01/01/2026"))
