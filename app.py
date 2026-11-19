@@ -588,8 +588,8 @@ if not st.session_state["home_entered"]:
         header {{ visibility: hidden !important; }}
         .scoutai-home-banner {{
             max-width: 860px;
-            margin: 1rem auto 1.25rem auto;
-            padding: 26px 24px;
+            margin: 0.5rem auto 0.75rem auto;
+            padding: 14px 18px;
             text-align: center;
             background-color: {tema['bg_card']};
             border: 1px solid {accent_hex};
@@ -597,24 +597,24 @@ if not st.session_state["home_entered"]:
             box-shadow: {box_shadow_glow};
         }}
         .scoutai-home-kicker {{
-            margin: 0 0 8px 0;
-            font-size: 13px;
+            margin: 0 0 4px 0;
+            font-size: 11px;
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 2px;
+            letter-spacing: 1.8px;
             color: {accent_hex} !important;
         }}
         .scoutai-home-title {{
             margin: 0;
-            font-size: clamp(22px, 3.4vw, 34px);
+            font-size: clamp(17px, 2.2vw, 24px);
             font-weight: 800;
-            line-height: 1.25;
+            line-height: 1.2;
             color: {tema['text_color']} !important;
         }}
     </style>
     """, unsafe_allow_html=True)
 
-    _, col_home, _ = st.columns([0.14, 0.72, 0.14])
+    _, col_home, _ = st.columns([0.16, 0.68, 0.16])
     with col_home:
         st.markdown(
             "<div class='scoutai-home-banner'>"
@@ -624,18 +624,18 @@ if not st.session_state["home_entered"]:
             unsafe_allow_html=True,
         )
 
+        if st.button("Inizia l'analisi", use_container_width=True, key="btn_inizia_analisi"):
+            st.session_state["home_entered"] = True
+            st.rerun()
+
+        st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+
         if HOME_IMAGE_PATH and os.path.exists(HOME_IMAGE_PATH):
             st.image(HOME_IMAGE_PATH, use_container_width=True)
         else:
             st.info("Salva l'immagine come `eagle.jpg` nella cartella dell'app per mostrarla nella schermata Home.")
 
-        st.markdown("<div style='height: 16px;'></div>", unsafe_allow_html=True)
-        if st.button("Inizia l'analisi", use_container_width=True, key="btn_inizia_analisi"):
-            st.session_state["home_entered"] = True
-            st.rerun()
-
     st.stop()
-
 # =====================================================================
 # HEADER CON LOGO IN ALTO A SINISTRA
 # =====================================================================
