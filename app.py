@@ -599,7 +599,7 @@ if not st.session_state["home_entered"]:
         .scoutai-home-kicker {{
             margin: 0 0 4px 0;
             font-size: 11px;
-            font-weight: 700;
+            font-weight: 400;
             text-transform: uppercase;
             letter-spacing: 1.8px;
             color: {accent_hex} !important;
@@ -607,7 +607,7 @@ if not st.session_state["home_entered"]:
         .scoutai-home-title {{
             margin: 0;
             font-size: clamp(17px, 2.2vw, 24px);
-            font-weight: 800;
+            font-weight: 500;
             line-height: 1.2;
             color: {tema['text_color']} !important;
         }}
