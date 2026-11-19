@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import altair as alt
 import io
 import time
 import os
@@ -284,6 +285,7 @@ def inizializza_sicurezza_ruoli(dati_salvati):
             "sezioni_ragazzi": cfg_salvata.get("sezioni_ragazzi") or [
                 "🎥 Video Analisi",
                 "📈 Riepilogo Squadra",
+                "📊 Grafici & Analisi Visiva",
             ],
         }
     if "is_admin" not in st.session_state:
@@ -587,7 +589,7 @@ if not st.session_state["home_entered"]:
         [data-testid="stSidebar"] {{ display: none !important; }}
         header {{ visibility: hidden !important; }}
         .scoutai-home-banner {{
-            max-width: 1260px;
+            max-width: 860px;
             margin: 0.5rem auto 0.75rem auto;
             padding: 14px 18px;
             text-align: center;
@@ -599,15 +601,15 @@ if not st.session_state["home_entered"]:
         .scoutai-home-kicker {{
             margin: 0 0 4px 0;
             font-size: 11px;
-            font-weight: 400;
+            font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 1.8px;
             color: {accent_hex} !important;
         }}
         .scoutai-home-title {{
             margin: 0;
-            font-size: clamp(15px, 2.2vw, 18px);
-            font-weight: 500;
+            font-size: clamp(17px, 2.2vw, 24px);
+            font-weight: 800;
             line-height: 1.2;
             color: {tema['text_color']} !important;
         }}
@@ -619,7 +621,7 @@ if not st.session_state["home_entered"]:
         st.markdown(
             "<div class='scoutai-home-banner'>"
             "<div class='scoutai-home-kicker'>ScoutAI · Match Analysis</div>"
-            "<h1 class='scoutai-home-title'>Accedi ai dati partita dell'USO NUVOLENTO - 2011</h1>"
+            "<h1 class='scoutai-home-title'>Benvenuti nella fortezza dei dati dell'USO NUVOLENTO - 2011</h1>"
             "</div>",
             unsafe_allow_html=True,
         )
@@ -636,6 +638,7 @@ if not st.session_state["home_entered"]:
             st.info("Salva l'immagine come `eagle.jpg` nella cartella dell'app per mostrarla nella schermata Home.")
 
     st.stop()
+
 # =====================================================================
 # HEADER CON LOGO IN ALTO A SINISTRA
 # =====================================================================
@@ -952,6 +955,7 @@ with st.sidebar:
         "⚡ Inserimento Parametri & Voti",
         "🎥 Video Analisi",
         "📈 Riepilogo Squadra",
+        "📊 Grafici & Analisi Visiva",
         "👤 Gestione Rosa",
         "🎨 Editor Grafica",
     ]
@@ -962,7 +966,7 @@ with st.sidebar:
         sezioni_disponibili = tutte_le_sezioni
     else:
         ammesse = [s for s in auth_cfg.get("sezioni_ragazzi", []) if s in tutte_le_sezioni]
-        sezioni_disponibili = ammesse if ammesse else ["🎥 Video Analisi", "📈 Riepilogo Squadra"]
+        sezioni_disponibili = ammesse if ammesse else ["🎥 Video Analisi", "📈 Riepilogo Squadra", "📊 Grafici & Analisi Visiva"]
 
     menu = st.radio("Navigazione", sezioni_disponibili)
 
@@ -1685,7 +1689,198 @@ elif menu == "📈 Riepilogo Squadra":
         st.info("Nessuna partita con dati registrati per questo giocatore.")
 
 # =====================================================================
-# 5. GESTIONE ROSA
+# 5. GRAFICI & ANALISI VISIVA
+# =====================================================================
+elif menu == "📊 Grafici & Analisi Visiva":
+    st.title("📊 Grafici & Analisi Visiva")
+
+    if not db_partite:
+        st.warning("⚠️ Nessuna partita disponibile per generare i grafici.")
+        st.stop()
+
+    partite_ordinate = sorted(
+        db_partite.items(),
+        key=lambda item: parse_data_partita(item[1].get("data", "01/01/2026"))
+    )
+
+    # --- Sezione 1: Voto Medio Squadra per Partita ---
+    st.subheader("🏆 Voto Medio Squadra per Partita")
+    filtro_luogo = st.radio(
+        "Filtra partite",
+        ["Tutte", "Casa", "Trasferta"],
+        horizontal=True,
+        key="filtro_luogo_grafici"
+    )
+
+    righe_squadra_graf = []
+    for idx_ord, (p_nome, p_val) in enumerate(partite_ordinate, start=1):
+        luogo_m = p_val.get("casa_trasferta", "Casa")
+        if filtro_luogo != "Tutte" and luogo_m != filtro_luogo:
+            continue
+
+        voti_match = []
+        for n, nome in p_val.get("formazione", {}).items():
+            if not nome:
+                continue
+            is_portiere = (str(n) in ["1", "12"])
+            d_p = p_val.get("dati_prestazione", {}).get(nome, {})
+            if d_p and int(d_p.get("minuti", 0)) > 0:
+                v_g = calcola_voto(d_p, is_portiere)
+                if v_g is not None:
+                    voti_match.append(v_g)
+
+        if voti_match:
+            righe_squadra_graf.append({
+                "Ordine": idx_ord,
+                "Partita": p_nome,
+                "Data": p_val.get("data", "N.D."),
+                "Luogo": luogo_m,
+                "Voto Medio": round(sum(voti_match) / len(voti_match), 2)
+            })
+
+    if righe_squadra_graf:
+        df_sq = pd.DataFrame(righe_squadra_graf)
+        chart_sq = (
+            alt.Chart(df_sq)
+            .mark_bar(cornerRadiusTopLeft=6, cornerRadiusTopRight=6, color=accent_hex)
+            .encode(
+                x=alt.X("Partita:N", sort=alt.EncodingSortField(field="Ordine", order="ascending"), title="Partita"),
+                y=alt.Y("Voto Medio:Q", scale=alt.Scale(domain=[0, 10]), title="Voto Medio Squadra"),
+                tooltip=["Partita", "Data", "Luogo", "Voto Medio"]
+            )
+            .properties(height=300)
+        )
+        st.altair_chart(chart_sq, use_container_width=True)
+    else:
+        st.info("Nessun voto disponibile per il filtro selezionato.")
+
+    st.divider()
+
+    # --- Sezione 2: Andamento Voti & Parametri del Giocatore ---
+    st.subheader("📈 Andamento Voti & Parametri Giocatore")
+    nomi_rosa = list(db_giocatori.keys()) if db_giocatori else []
+    if not nomi_rosa:
+        st.info("Aggiungi almeno un giocatore in Gestione Rosa per visualizzare i grafici individuali.")
+        st.stop()
+
+    gioc_graf = st.selectbox("Seleziona Giocatore", nomi_rosa, key="sel_giocatore_grafici")
+
+    righe_voti_gioc = []
+    tot_min_g = 0
+    tot_gol_g = 0
+    tot_perse_g = 0
+    tot_duelli_v_g = 0
+    tot_tiri_p_g = 0
+    tot_parate_g = 0
+
+    for idx_ord, (p_nome, p_val) in enumerate(partite_ordinate, start=1):
+        formazione = p_val.get("formazione", {})
+        for n, nome in formazione.items():
+            if nome == gioc_graf:
+                d_p = p_val.get("dati_prestazione", {}).get(gioc_graf, {})
+                if not d_p:
+                    continue
+                min_m = int(d_p.get("minuti", 0))
+                is_portiere = (str(n) in ["1", "12"])
+
+                if min_m > 0:
+                    tot_min_g += min_m
+                    v_m = calcola_voto(d_p, is_portiere)
+                    if v_m is not None:
+                        righe_voti_gioc.append({
+                            "Ordine": idx_ord,
+                            "Partita": p_nome,
+                            "Minuti": min_m,
+                            "Voto": v_m
+                        })
+
+                if "parate" in d_p or "uscite" in d_p or "gol_subiti_resp" in d_p:
+                    tot_parate_g += int(d_p.get("parate", 0))
+                else:
+                    d_v, _ = parse_frazione(d_p.get("duelli", "0/0"))
+                    t_p, _ = parse_frazione(d_p.get("tiri", "0/0"))
+                    tot_duelli_v_g += d_v
+                    tot_tiri_p_g += t_p
+                    tot_gol_g += int(d_p.get("gol_fatti", 0))
+                    tot_perse_g += int(d_p.get("perse", 0))
+
+    col_g_sx, col_g_dx = st.columns(2)
+
+    with col_g_sx:
+        st.markdown(f"**Voto partita per partita ({gioc_graf})**")
+        if righe_voti_gioc:
+            df_vg = pd.DataFrame(righe_voti_gioc)
+            media_g = round(df_vg["Voto"].mean(), 2)
+            df_vg["Media Stagionale"] = media_g
+
+            linea_voto = (
+                alt.Chart(df_vg)
+                .mark_line(point=True, strokeWidth=3, color=accent_hex)
+                .encode(
+                    x=alt.X("Partita:N", sort=alt.EncodingSortField(field="Ordine", order="ascending"), title="Partita"),
+                    y=alt.Y("Voto:Q", scale=alt.Scale(domain=[1, 10]), title="Voto"),
+                    tooltip=["Partita", "Minuti", "Voto", "Media Stagionale"]
+                )
+            )
+            linea_media = (
+                alt.Chart(df_vg)
+                .mark_rule(strokeDash=[5, 5], color="#94a3b8")
+                .encode(y="Media Stagionale:Q")
+            )
+            st.altair_chart((linea_voto + linea_media).properties(height=280), use_container_width=True)
+        else:
+            st.info("Nessuna partita votata (con minuti > 0) per questo giocatore.")
+
+    with col_g_dx:
+        st.markdown(f"**Totali parametri accumulati ({gioc_graf})**")
+        if tot_parate_g > 0 or tot_duelli_v_g > 0 or tot_tiri_p_g > 0 or tot_gol_g > 0 or tot_perse_g > 0:
+            if tot_parate_g > 0 and tot_duelli_v_g == 0 and tot_gol_g == 0:
+                df_param = pd.DataFrame({
+                    "Parametro": ["Parate", "Minuti (x10)"],
+                    "Valore": [tot_parate_g, round(tot_min_g / 10, 1)]
+                })
+            else:
+                df_param = pd.DataFrame({
+                    "Parametro": ["Duelli Vinti", "Tiri in Porta", "Gol Segnati", "Palle Perse"],
+                    "Valore": [tot_duelli_v_g, tot_tiri_p_g, tot_gol_g, tot_perse_g]
+                })
+            st.bar_chart(df_param.set_index("Parametro"), height=280)
+        else:
+            st.info("Nessun parametro statistico registrato per questo giocatore.")
+
+    st.divider()
+
+    # --- Sezione 3: Confronto Rosa (Minuti Giocati e Gol) ---
+    st.subheader("👥 Confronto Rosa: Minuti Giocati & Gol Segnati")
+    righe_rosa_graf = []
+    for nome_r in nomi_rosa:
+        min_r = 0
+        gol_r = 0
+        for _, p_val in partite_ordinate:
+            for _, g_in_form in p_val.get("formazione", {}).items():
+                if g_in_form == nome_r:
+                    d_p = p_val.get("dati_prestazione", {}).get(nome_r, {})
+                    if d_p:
+                        min_r += int(d_p.get("minuti", 0))
+                        gol_r += int(d_p.get("gol_fatti", 0))
+        righe_rosa_graf.append({
+            "Giocatore": nome_r,
+            "Minuti Giocati": min_r,
+            "Gol Segnati": gol_r
+        })
+
+    if righe_rosa_graf:
+        df_rosa_g = pd.DataFrame(righe_rosa_graf).sort_values("Minuti Giocati", ascending=False)
+        c_r1, c_r2 = st.columns(2)
+        with c_r1:
+            st.markdown("**Minuti giocati in stagione**")
+            st.bar_chart(df_rosa_g.set_index("Giocatore")[["Minuti Giocati"]], height=280)
+        with c_r2:
+            st.markdown("**Gol segnati in stagione**")
+            st.bar_chart(df_rosa_g.sort_values("Gol Segnati", ascending=False).set_index("Giocatore")[["Gol Segnati"]], height=280)
+
+# =====================================================================
+# 6. GESTIONE ROSA
 # =====================================================================
 elif menu == "👤 Gestione Rosa":
     st.title("👤 Gestione Rosa Squadra")
@@ -1844,7 +2039,7 @@ elif menu == "👤 Gestione Rosa":
                                 st.rerun()
 
 # =====================================================================
-# 6. EDITOR GRAFICA & SETTINGS
+# 7. EDITOR GRAFICA & SETTINGS
 # =====================================================================
 elif menu == "🎨 Editor Grafica":
     st.title("🎨 Editor Grafica & Impostazioni UI")
@@ -1927,7 +2122,7 @@ elif menu == "🎨 Editor Grafica":
         st.rerun()
 
 # =====================================================================
-# 7. PANNELLO ADMIN
+# 8. PANNELLO ADMIN
 # =====================================================================
 elif menu == "🛡️ Pannello Admin":
     if not st.session_state.get("is_admin", False):
@@ -1948,6 +2143,7 @@ elif menu == "🛡️ Pannello Admin":
             "⚡ Inserimento Parametri & Voti",
             "🎥 Video Analisi",
             "📈 Riepilogo Squadra",
+            "📊 Grafici & Analisi Visiva",
             "👤 Gestione Rosa",
         ]
         sezioni_scelte = st.multiselect(
