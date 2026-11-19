@@ -216,9 +216,10 @@ def hex_to_rgba(hex_color, alpha):
     return f"rgba({r}, {g}, {b}, {alpha_clamped:.2f})"
 
 # =====================================================================
-# GESTIONE LOGO, FOTO GIOCATORI, SICUREZZA RUOLI & FILE JSON
+# GESTIONE LOGO, IMMAGINE HOME, FOTO GIOCATORI, SICUREZZA & FILE JSON
 # =====================================================================
 LOGO_PATH = "Channel logo.jpg" if os.path.exists("Channel logo.jpg") else ("logo.png" if os.path.exists("logo.png") else None)
+HOME_IMAGE_PATH = "eagle.jpg" if os.path.exists("eagle.jpg") else ("eagle.png" if os.path.exists("eagle.png") else None)
 DB_FILE = "scoutai_database.json"
 PLAYER_PHOTOS_DIR = "player_photos"
 
@@ -344,6 +345,9 @@ PRESET_TEMI = {
 
 dati_salvati = carica_dati_da_disco()
 inizializza_sicurezza_ruoli(dati_salvati)
+
+if "home_entered" not in st.session_state:
+    st.session_state["home_entered"] = False
 
 if "ui_theme" not in st.session_state:
     base_theme = PRESET_TEMI["Emerald Dark (Default)"].copy()
@@ -573,6 +577,64 @@ def mostra_notifica_tema(messaggio, icona="✅"):
         <div style="font-weight: 600; color: {tema['text_color']};">{messaggio}</div>
     </div>
     """, unsafe_allow_html=True)
+
+# =====================================================================
+# SCHERMATA HOME DI ACCESSO
+# =====================================================================
+if not st.session_state["home_entered"]:
+    st.markdown(f"""
+    <style>
+        [data-testid="stSidebar"] {{ display: none !important; }}
+        header {{ visibility: hidden !important; }}
+        .scoutai-home-banner {{
+            max-width: 860px;
+            margin: 1rem auto 1.25rem auto;
+            padding: 26px 24px;
+            text-align: center;
+            background-color: {tema['bg_card']};
+            border: 1px solid {accent_hex};
+            border-radius: {radius_px}px;
+            box-shadow: {box_shadow_glow};
+        }}
+        .scoutai-home-kicker {{
+            margin: 0 0 8px 0;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: {accent_hex} !important;
+        }}
+        .scoutai-home-title {{
+            margin: 0;
+            font-size: clamp(22px, 3.4vw, 34px);
+            font-weight: 800;
+            line-height: 1.25;
+            color: {tema['text_color']} !important;
+        }}
+    </style>
+    """, unsafe_allow_html=True)
+
+    _, col_home, _ = st.columns([0.14, 0.72, 0.14])
+    with col_home:
+        st.markdown(
+            "<div class='scoutai-home-banner'>"
+            "<div class='scoutai-home-kicker'>ScoutAI · Match Analysis</div>"
+            "<h1 class='scoutai-home-title'>Benvenuti nella fortezza dei dati dell'USO NUVOLENTO - 2011</h1>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+        if HOME_IMAGE_PATH and os.path.exists(HOME_IMAGE_PATH):
+            st.image(HOME_IMAGE_PATH, use_container_width=True)
+        else:
+            st.info("Salva l'immagine come `eagle.jpg` nella cartella dell'app per mostrarla nella schermata Home.")
+
+        st.markdown("<div style='height: 16px;'></div>", unsafe_allow_html=True)
+        if st.button("Inizia l'analisi", use_container_width=True, key="btn_inizia_analisi"):
+            st.session_state["home_entered"] = True
+            st.rerun()
+
+    st.stop()
 
 # =====================================================================
 # HEADER CON LOGO IN ALTO A SINISTRA
@@ -858,6 +920,10 @@ def selettore_partita_persistente(label, widget_key):
     )
 
 with st.sidebar:
+    if st.button("🏠 Schermata Home", use_container_width=True, key="btn_torna_home"):
+        st.session_state["home_entered"] = False
+        st.rerun()
+
     st.markdown("### 🔐 Accesso & Ruoli")
     if st.session_state["is_admin"]:
         st.success("Modalità attiva: **Admin**")
