@@ -700,7 +700,6 @@ def mostra_notifica_tema(messaggio, icona="✅"):
 # SCHERMATA HOME DI ACCESSO
 # =====================================================================
 if not st.session_state["home_entered"]:
-    # Se il client ha già salvato il proprio utente in localStorage, lo recupera in ?utente=
     sincronizza_client_localstorage(utente_da_salvare=None)
 
     st.markdown(f"""
@@ -2367,8 +2366,27 @@ elif menu == "🛡️ Pannello Admin":
     )
     st.table(df_accessi)
 
-    if st.button("🗑️ Azzera Contatori Accessi", key="btn_reset_accessi"):
-        st.session_state["statistiche_accessi"] = {}
-        salva_dati_su_disco()
-        st.success("Contatori accessi azzerati!")
-        st.rerun()
+    col_rst_singolo, col_rst_tutti = st.columns([2, 1.3])
+    with col_rst_singolo:
+        utente_reset = st.selectbox(
+            "Seleziona utente da azzerare",
+            options=opzioni_reg,
+            key="sel_utente_reset_accessi",
+            label_visibility="collapsed"
+        )
+        if st.button("🔄 Reset Contatore Accessi", use_container_width=True, key="btn_reset_singolo_accesso"):
+            st.session_state.setdefault("statistiche_accessi", {})[utente_reset] = {
+                "count": 0,
+                "ultimo_accesso": "Mai",
+            }
+            salva_dati_su_disco()
+            st.success(f"Contatore accessi resettato per {utente_reset}!")
+            st.rerun()
+
+    with col_rst_tutti:
+        st.markdown("<div style='height: 38px;'></div>", unsafe_allow_html=True)
+        if st.button("🗑️ Reset Tutti gli Accessi", use_container_width=True, key="btn_reset_accessi"):
+            st.session_state["statistiche_accessi"] = {}
+            salva_dati_su_disco()
+            st.success("Tutti i contatori accessi sono stati resettati!")
+            st.rerun()
