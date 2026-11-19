@@ -619,7 +619,7 @@ if not st.session_state["home_entered"]:
         st.markdown(
             "<div class='scoutai-home-banner'>"
             "<div class='scoutai-home-kicker'>ScoutAI · Match Analysis</div>"
-            "<h1 class='scoutai-home-title'>Benvenuti nella fortezza dei dati dell'USO NUVOLENTO - 2011</h1>"
+            "<h1 class='scoutai-home-title'>Accedi ai dati partita dell'USO NUVOLENTO - 2011</h1>"
             "</div>",
             unsafe_allow_html=True,
         )
