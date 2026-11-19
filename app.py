@@ -104,6 +104,54 @@ def ruolo_default_da_rosa(ruolo_rosa_str):
         return "TQ"
     return "CC"
 
+def valori_base_giocatore(nome_g, is_portiere, is_riserva, db_giocatori):
+    """Restituisce i valori iniziali/azzerati per un giocatore."""
+    min_default = 0 if is_riserva else 80
+    if is_portiere:
+        return {
+            "minuti": min_default,
+            "parate": 0,
+            "uscite": "0/0",
+            "gol_subiti_resp": "0/0",
+        }
+    return {
+        "ruolo_campo": ruolo_default_da_rosa(db_giocatori.get(nome_g, {}).get("ruolo", "")),
+        "minuti": min_default,
+        "duelli": "0/0",
+        "efficacia_passaggi": "Buona",
+        "perse": 0,
+        "tiri": "0/0",
+        "gol_fatti": 0,
+        "salvataggi": 0,
+    }
+
+def ripristina_parametri_partita(partita_sel, p_dati, db_giocatori):
+    """Riporta ai valori base tutti i parametri della partita selezionata e pulisce i widget in session_state."""
+    p_dati["dati_prestazione"] = {}
+    for k_str, nome_g in p_dati.get("formazione", {}).items():
+        if not nome_g:
+            continue
+        num_int = int(k_str) if str(k_str).isdigit() else 0
+        is_portiere = str(k_str) in ["1", "12"]
+        is_riserva = num_int >= 12
+        p_dati["dati_prestazione"][nome_g] = valori_base_giocatore(
+            nome_g, is_portiere=is_portiere, is_riserva=is_riserva, db_giocatori=db_giocatori
+        )
+
+    prefissi = (
+        f"min_{partita_sel}_", f"par_{partita_sel}_", f"usc_{partita_sel}_", f"gol_sub_{partita_sel}_",
+        f"ruolo_{partita_sel}_", f"due_{partita_sel}_", f"pas_{partita_sel}_", f"per_{partita_sel}_",
+        f"tir_{partita_sel}_", f"gol_{partita_sel}_",
+        f"min_res_{partita_sel}_", f"par_res_{partita_sel}_", f"usc_res_{partita_sel}_", f"gol_sub_res_{partita_sel}_",
+        f"ruolo_res_{partita_sel}_", f"due_res_{partita_sel}_", f"pas_res_{partita_sel}_", f"per_res_{partita_sel}_",
+        f"tir_res_{partita_sel}_", f"gol_res_{partita_sel}_",
+    )
+    for k_widget in [k for k in st.session_state.keys() if k.startswith(prefissi)]:
+        del st.session_state[k_widget]
+
+    st.session_state["partita_attiva"] = partita_sel
+    salva_dati_su_disco()
+
 def parse_frazione(val_str):
     """Restituisce (numeratore, denominatore) da stringhe tipo '5/5' o '0/1'."""
     try:
@@ -774,7 +822,16 @@ elif menu == "⚡ Inserimento Parametri & Voti":
     if "dati_prestazione" not in p_dati:
         p_dati["dati_prestazione"] = {}
 
-    st.subheader(f"Analisi Match: {partita_sel} (Risultato: {p_dati.get('risultato', 'N.D.')} | {p_dati.get('casa_trasferta', 'Casa')})")
+    col_tit_sez, col_btn_reset = st.columns([3.5, 1])
+    with col_tit_sez:
+        st.subheader(f"Analisi Match: {partita_sel} (Risultato: {p_dati.get('risultato', 'N.D.')} | {p_dati.get('casa_trasferta', 'Casa')})")
+    with col_btn_reset:
+        st.markdown("<div style='height: 18px;'></div>", unsafe_allow_html=True)
+        if st.button("🔄 Ripristina valori", use_container_width=True, key=f"btn_ripristina_valori_{partita_sel}"):
+            ripristina_parametri_partita(partita_sel, p_dati, db_giocatori)
+            st.success("Valori ripristinati ai dati base!")
+            st.rerun()
+
     st.caption("Efficacia passaggi: Ottima (+0,7) · Buona (+0,4) · Sufficiente (+0,1) · Insufficiente (-0,3) · Pessima (-0,5), pesata sul ruolo. Gol = +1 per tutti.")
 
     with st.form("form_inserimento_parametri"):
