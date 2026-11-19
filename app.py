@@ -43,6 +43,13 @@ DELTA_EFFICACIA_PASSAGGI = {
     "Insufficiente": -0.3,
     "Pessima": -0.5,
 }
+SCALA_MEDIA_EFFICACIA_PASSAGGI = {
+    "Ottima": 2.0,
+    "Buona": 1.0,
+    "Sufficiente": 0.0,
+    "Insufficiente": -1.0,
+    "Pessima": -2.0,
+}
 
 def normalizza_efficacia_passaggi(valore):
     """Converte valori vecchi (es. percentuali o stringhe) in una categoria valida."""
@@ -62,6 +69,17 @@ def normalizza_efficacia_passaggi(valore):
             return "Pessima"
     except Exception:
         return "Buona"
+
+def calcola_efficacia_passaggi_media(valori):
+    """Restituisce l'etichetta media finale su scala ordinata (con preferenza al livello superiore in caso di parità)."""
+    if not valori:
+        return "N.D."
+    normalizzati = [normalizza_efficacia_passaggi(v) for v in valori]
+    media_scala = sum(SCALA_MEDIA_EFFICACIA_PASSAGGI[e] for e in normalizzati) / len(normalizzati)
+    return min(
+        OPZIONI_EFFICACIA_PASSAGGI,
+        key=lambda k: abs(SCALA_MEDIA_EFFICACIA_PASSAGGI[k] - media_scala)
+    )
 
 def get_macro_ruolo(ruolo_specifico):
     if ruolo_specifico in RUOLI_DIFENSORI:
@@ -1064,20 +1082,7 @@ elif menu == "📈 Riepilogo Squadra":
     """, unsafe_allow_html=True)
 
     if ha_dati_movimento:
-        if lista_efficacia_passaggi:
-            punteggio_medio_eff = sum(DELTA_EFFICACIA_PASSAGGI[e] for e in lista_efficacia_passaggi) / len(lista_efficacia_passaggi)
-            efficacia_media_label = min(
-                OPZIONI_EFFICACIA_PASSAGGI,
-                key=lambda k: abs(DELTA_EFFICACIA_PASSAGGI[k] - punteggio_medio_eff)
-            )
-            conteggio_eff = ", ".join(
-                f"{val}: {lista_efficacia_passaggi.count(val)}"
-                for val in OPZIONI_EFFICACIA_PASSAGGI
-                if lista_efficacia_passaggi.count(val) > 0
-            )
-            valore_pass_metric = f"{efficacia_media_label} ({conteggio_eff})"
-        else:
-            valore_pass_metric = "N.D."
+        valore_pass_metric = calcola_efficacia_passaggi_media(lista_efficacia_passaggi)
 
         m1, m2, m3, m4, m5 = st.columns(5)
         m1.metric("Duelli (V/T)", f"{tot_duelli_v}/{tot_duelli_t}")
