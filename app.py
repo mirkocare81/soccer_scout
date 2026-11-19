@@ -137,6 +137,7 @@ def salva_dati_su_disco():
         data_to_save = {
             "giocatori": st.session_state.get("database_giocatori", {}),
             "partite": st.session_state.get("database_partite", {}),
+            "partita_attiva": st.session_state.get("partita_attiva"),
             "ui_theme": st.session_state.get("ui_theme", {}),
             "fullscreen_mode": st.session_state.get("fullscreen_mode", False)
         }
@@ -229,6 +230,8 @@ if dati_salvati:
         st.session_state["database_giocatori"] = dati_salvati.get("giocatori", {})
     if "database_partite" not in st.session_state:
         st.session_state["database_partite"] = dati_salvati.get("partite", {})
+    if "partita_attiva" not in st.session_state:
+        st.session_state["partita_attiva"] = dati_salvati.get("partita_attiva")
 else:
     if "database_giocatori" not in st.session_state:
         st.session_state["database_giocatori"] = {
@@ -256,6 +259,8 @@ else:
                 "dati_prestazione": {}
             }
         }
+    if "partita_attiva" not in st.session_state:
+        st.session_state["partita_attiva"] = "Virtus (15/03/2026)"
     salva_dati_su_disco()
 
 tema = st.session_state["ui_theme"]
@@ -573,7 +578,7 @@ def genera_pdf_partita(match_name, match_data, db_giocatori, accent_hex):
     return filename
 
 # =====================================================================
-# SIDEBAR & NAVIGAZIONE
+# SIDEBAR, PERSISTENZA SELEZIONE PARTITA & NAVIGAZIONE
 # =====================================================================
 db_giocatori = st.session_state["database_giocatori"]
 db_partite = st.session_state["database_partite"]
@@ -581,6 +586,50 @@ db_partite = st.session_state["database_partite"]
 if time.time() - st.session_state["last_auto_save"] > 30:
     st.session_state["last_auto_save"] = time.time()
     salva_dati_su_disco()
+
+partite_ordinate_chiavi = [
+    item[0] for item in sorted(
+        db_partite.items(),
+        key=lambda x: parse_data_partita(x[1].get("data", "01/01/2026"))
+    )
+]
+
+if partite_ordinate_chiavi:
+    if st.session_state.get("partita_attiva") not in partite_ordinate_chiavi:
+        st.session_state["partita_attiva"] = partite_ordinate_chiavi[0]
+else:
+    st.session_state["partita_attiva"] = None
+
+def get_partita_attiva_corrente():
+    if not partite_ordinate_chiavi:
+        return None
+    curr = st.session_state.get("partita_attiva")
+    if curr in partite_ordinate_chiavi:
+        return curr
+    st.session_state["partita_attiva"] = partite_ordinate_chiavi[0]
+    return partite_ordinate_chiavi[0]
+
+def selettore_partita_persistente(label, widget_key):
+    """Renderizza un selectbox sincronizzato con partita_attiva e salvato su disco al cambio."""
+    if not partite_ordinate_chiavi:
+        return st.selectbox(label, ["Nessuna Partita"], key=widget_key)
+
+    corrente = get_partita_attiva_corrente()
+    idx = partite_ordinate_chiavi.index(corrente) if corrente in partite_ordinate_chiavi else 0
+
+    def _on_change_partita():
+        scelta = st.session_state.get(widget_key)
+        if scelta in db_partite:
+            st.session_state["partita_attiva"] = scelta
+            salva_dati_su_disco()
+
+    return st.selectbox(
+        label,
+        partite_ordinate_chiavi,
+        index=idx,
+        key=widget_key,
+        on_change=_on_change_partita
+    )
 
 menu = st.sidebar.radio("Navigazione", [
     "📋 Setup Partite & Formazioni", 
@@ -591,13 +640,6 @@ menu = st.sidebar.radio("Navigazione", [
     "🎨 Editor Grafica"
 ])
 
-partite_ordinate_chiavi = [
-    item[0] for item in sorted(
-        db_partite.items(),
-        key=lambda x: parse_data_partita(x[1].get("data", "01/01/2026"))
-    )
-]
-
 # =====================================================================
 # 1. SETUP PARTITE & FORMAZIONI
 # =====================================================================
@@ -606,7 +648,7 @@ if menu == "📋 Setup Partite & Formazioni":
 
     col_sel_p, col_new_p, col_del_p = st.columns([3, 0.4, 0.4])
     with col_sel_p:
-        partita_selezionata = st.selectbox("Seleziona Partita", partite_ordinate_chiavi if partite_ordinate_chiavi else ["Nessuna Partita"])
+        partita_selezionata = selettore_partita_persistente("Seleziona Partita", "sel_partita_setup")
     with col_new_p:
         st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
         with st.expander("➕"):
@@ -625,6 +667,7 @@ if menu == "📋 Setup Partite & Formazioni":
                             "formazione": {str(i): "" for i in range(1, 21)},
                             "dati_prestazione": {}
                         }
+                        st.session_state["partita_attiva"] = nome_p
                         salva_dati_su_disco()
                         st.success(f"Partita {nome_p} creata!")
                         st.rerun()
@@ -635,6 +678,11 @@ if menu == "📋 Setup Partite & Formazioni":
                 st.warning(f"Eliminare '{partita_selezionata}'?")
                 if st.button("🗑️ Conferma"):
                     del db_partite[partita_selezionata]
+                    rimanenti = sorted(
+                        db_partite.keys(),
+                        key=lambda k: parse_data_partita(db_partite[k].get("data", "01/01/2026"))
+                    )
+                    st.session_state["partita_attiva"] = rimanenti[0] if rimanenti else None
                     salva_dati_su_disco()
                     st.success("Partita eliminata!")
                     st.rerun()
@@ -705,6 +753,7 @@ if menu == "📋 Setup Partite & Formazioni":
                 p_info["risultato"] = nuovo_risultato
                 p_info["casa_trasferta"] = nuovo_ct
                 p_info["modulo"] = nuovo_modulo
+                st.session_state["partita_attiva"] = partita_selezionata
                 salva_dati_su_disco()
                 st.success("Dati partita e formazione salvati con successo!")
                 st.rerun()
@@ -719,7 +768,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
         st.warning("⚠️ Crea prima una partita nella sezione 'Setup Partite & Formazioni'.")
         st.stop()
 
-    partita_sel = st.selectbox("Seleziona Partita da Analizzare", partite_ordinate_chiavi, key="analizza_partita")
+    partita_sel = selettore_partita_persistente("Seleziona Partita da Analizzare", "analizza_partita")
     p_dati = db_partite[partita_sel]
 
     if "dati_prestazione" not in p_dati:
@@ -866,6 +915,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
             st.markdown("---")
 
         if st.form_submit_button("💾 Salva Parametri e Calcola Voti"):
+            st.session_state["partita_attiva"] = partita_sel
             salva_dati_su_disco()
             st.success("Parametri salvati automaticamente su disco e voti aggiornati per questa partita!")
             st.rerun()
@@ -906,7 +956,7 @@ elif menu == "🎥 Video Analisi":
         st.warning("⚠️ Crea prima una partita nella sezione 'Setup Partite & Formazioni'.")
         st.stop()
 
-    partita_sel = st.selectbox("Seleziona Partita per la Video Analisi", partite_ordinate_chiavi, key="video_partita")
+    partita_sel = selettore_partita_persistente("Seleziona Partita per la Video Analisi", "video_partita")
     p_info = db_partite[partita_sel]
 
     if "youtube_link" not in p_info:
@@ -930,6 +980,7 @@ elif menu == "🎥 Video Analisi":
         
         if st.button("▶️ Play Video", use_container_width=True):
             p_info["youtube_link"] = link_inserito
+            st.session_state["partita_attiva"] = partita_sel
             salva_dati_su_disco()
             st.success("Link aggiornato con successo!")
             st.rerun()
