@@ -921,7 +921,7 @@ elif menu == "📈 Riepilogo Squadra":
         p1, p2, p3 = st.columns(3)
         p1.metric("Parate Totali", tot_parate)
         p2.metric("Uscite (Rius./Tent.)", f"{tot_uscite_v}/{tot_uscite_t}")
-        p3.metric("Gol Subiti / Respinti", f"{tot_gol_sub}/{tot_gol_resp}")
+        p3.metric("Gol Subiti / Responsabile", f"{tot_gol_sub}/{tot_gol_resp}")
 
     if not ha_dati_movimento and not ha_dati_portiere:
         st.info("Nessun parametro registrato per questo giocatore.")
