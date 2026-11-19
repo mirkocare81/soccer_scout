@@ -126,8 +126,9 @@ def valori_base_giocatore(nome_g, is_portiere, is_riserva, db_giocatori):
     }
 
 def ripristina_parametri_partita(partita_sel, p_dati, db_giocatori):
-    """Riporta ai valori base tutti i parametri della partita e aggiorna subito i widget in session_state."""
-    p_dati["dati_prestazione"] = {}
+    """Riporta ai valori base i parametri della partita senza modificare il ruolo già impostato."""
+    dati_attuali = p_dati.get("dati_prestazione", {})
+    nuovi_dati = {}
     formazione = p_dati.get("formazione", {})
 
     for k_str, nome_g in formazione.items():
@@ -138,12 +139,23 @@ def ripristina_parametri_partita(partita_sel, p_dati, db_giocatori):
         is_portiere = str(k_str) in ["1", "12"]
         is_riserva = num_int >= 12
 
+        prev_vals = dati_attuali.get(nome_g, {})
         base = valori_base_giocatore(
             nome_g, is_portiere=is_portiere, is_riserva=is_riserva, db_giocatori=db_giocatori
         )
-        p_dati["dati_prestazione"][nome_g] = base.copy()
 
-        # Aggiorna subito le chiavi dei widget corrispondenti a quello slot (titolare o riserva)
+        if not is_portiere:
+            chiave_ruolo_widget = f"ruolo_res_{partita_sel}_{num_int}" if is_riserva else f"ruolo_{partita_sel}_{num_int}"
+            ruolo_da_mantenere = (
+                prev_vals.get("ruolo_campo")
+                or st.session_state.get(chiave_ruolo_widget)
+                or base["ruolo_campo"]
+            )
+            base["ruolo_campo"] = ruolo_da_mantenere
+
+        nuovi_dati[nome_g] = base.copy()
+
+        # Aggiorna subito i widget dei parametri (escludendo ruolo_... / ruolo_res_...)
         if not is_riserva:
             if is_portiere:
                 st.session_state[f"min_{partita_sel}_{num_int}"] = int(base["minuti"])
@@ -151,7 +163,6 @@ def ripristina_parametri_partita(partita_sel, p_dati, db_giocatori):
                 st.session_state[f"usc_{partita_sel}_{num_int}"] = str(base["uscite"])
                 st.session_state[f"gol_sub_{partita_sel}_{num_int}"] = str(base["gol_subiti_resp"])
             else:
-                st.session_state[f"ruolo_{partita_sel}_{num_int}"] = str(base["ruolo_campo"])
                 st.session_state[f"min_{partita_sel}_{num_int}"] = int(base["minuti"])
                 st.session_state[f"due_{partita_sel}_{num_int}"] = str(base["duelli"])
                 st.session_state[f"pas_{partita_sel}_{num_int}"] = str(base["efficacia_passaggi"])
@@ -165,7 +176,6 @@ def ripristina_parametri_partita(partita_sel, p_dati, db_giocatori):
                 st.session_state[f"usc_res_{partita_sel}_{num_int}"] = str(base["uscite"])
                 st.session_state[f"gol_sub_res_{partita_sel}_{num_int}"] = str(base["gol_subiti_resp"])
             else:
-                st.session_state[f"ruolo_res_{partita_sel}_{num_int}"] = str(base["ruolo_campo"])
                 st.session_state[f"min_res_{partita_sel}_{num_int}"] = int(base["minuti"])
                 st.session_state[f"due_res_{partita_sel}_{num_int}"] = str(base["duelli"])
                 st.session_state[f"pas_res_{partita_sel}_{num_int}"] = str(base["efficacia_passaggi"])
@@ -173,6 +183,7 @@ def ripristina_parametri_partita(partita_sel, p_dati, db_giocatori):
                 st.session_state[f"tir_res_{partita_sel}_{num_int}"] = str(base["tiri"])
                 st.session_state[f"gol_res_{partita_sel}_{num_int}"] = int(base["gol_fatti"])
 
+    p_dati["dati_prestazione"] = nuovi_dati
     st.session_state["partita_attiva"] = partita_sel
     salva_dati_su_disco()
 
@@ -853,7 +864,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
         st.markdown("<div style='height: 18px;'></div>", unsafe_allow_html=True)
         if st.button("🔄 Ripristina valori", use_container_width=True, key=f"btn_ripristina_valori_{partita_sel}"):
             ripristina_parametri_partita(partita_sel, p_dati, db_giocatori)
-            st.success("Valori ripristinati ai dati base!")
+            st.success("Valori ripristinati ai dati base (ruoli mantenuti)!")
             st.rerun()
 
     st.caption("Efficacia passaggi: Ottima (+0,7) · Buona (+0,4) · Sufficiente (+0,1) · Insufficiente (-0,3) · Pessima (-0,5), pesata sul ruolo. Gol = +1 per tutti.")
