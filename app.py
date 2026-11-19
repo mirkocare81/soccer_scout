@@ -594,7 +594,9 @@ st.divider()
 def calcola_voto(p, is_portiere=False):
     try:
         minuti_giocati = int(p.get('minuti', 80))
-        fattore_tempo = minuti_giocati / 80.0 if minuti_giocati > 0 else 1.0
+        if minuti_giocati <= 0:
+            return None
+        fattore_tempo = minuti_giocati / 80.0
         rating = 6.0
 
         if is_portiere:
@@ -745,7 +747,8 @@ def genera_pdf_partita(match_name, match_data, db_giocatori, accent_hex):
             continue
         p_dati = match_data.get("dati_prestazione", {}).get(nome, {})
         is_portiere = (str(num) in ["1", "12"])
-        voto = calcola_voto(p_dati, is_portiere) if p_dati else "N.D."
+        voto_calcolato = calcola_voto(p_dati, is_portiere) if p_dati else None
+        voto = str(voto_calcolato) if voto_calcolato is not None else "N.D."
         ruolo = p_dati.get("ruolo_campo") or db_giocatori.get(nome, {}).get(
             "ruolo", "Portiere" if is_portiere else "Movimento"
         )
@@ -1072,7 +1075,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 st.success("Valori ripristinati ai dati base (ruoli mantenuti)!")
                 st.rerun()
 
-    st.caption("Efficacia passaggi: Ottima (+0,7) · Buona (+0,4) · Sufficiente (+0,1) · Insufficiente (-0,3) · Pessima (-0,5), pesata sul ruolo. Gol = +1 per tutti.")
+    st.caption("Efficacia passaggi: Ottima (+0,7) · Buona (+0,4) · Sufficiente (+0,1) · Insufficiente (-0,3) · Pessima (-0,5), pesata sul ruolo. Gol = +1 per tutti. Con 0' giocati il voto non viene conteggiato.")
 
     if lettura_only:
         righe_lettura = []
@@ -1081,7 +1084,8 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 continue
             is_portiere = (str(n) in ["1", "12"])
             p_g = p_dati.get("dati_prestazione", {}).get(nome, {})
-            voto_g = calcola_voto(p_g, is_portiere) if p_g else "N.D."
+            min_g = int(p_g.get("minuti", 0)) if p_g else 0
+            voto_g = calcola_voto(p_g, is_portiere) if (p_g and min_g > 0) else None
             if is_portiere:
                 dettaglio = (
                     f"Parate: {p_g.get('parate', 0)} | Uscite: {p_g.get('uscite', '0/0')} | "
@@ -1097,9 +1101,9 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 "N°": str(n),
                 "Giocatore": nome,
                 "Ruolo": p_g.get("ruolo_campo") or ("POR" if is_portiere else ruolo_default_da_rosa(db_giocatori.get(nome, {}).get("ruolo", ""))),
-                "Minuti": f"{p_g.get('minuti', 0)}'",
+                "Minuti": f"{min_g}'",
                 "Parametri": dettaglio,
-                "Voto": f"{voto_g} / 10" if voto_g != "N.D." else "N.D."
+                "Voto": f"{voto_g} / 10" if voto_g is not None else "N.D."
             })
         if righe_lettura:
             st.table(pd.DataFrame(righe_lettura))
@@ -1120,7 +1124,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                     st.markdown(f"**N° {i} — {nome_g}** *(PORTIERE)*")
                     c1, c2, c3, c4, c_voto = st.columns([1.5, 1.5, 1.5, 1.5, 1])
                     with c1:
-                        minuti = st.number_input("Minuti", 1, 80, int(current_vals.get("minuti", 80)), key=f"min_{partita_sel}_{i}")
+                        minuti = st.number_input("Minuti", 0, 80, int(current_vals.get("minuti", 80)), key=f"min_{partita_sel}_{i}")
                     with c2:
                         parate = st.number_input("Parate", 0, 20, int(current_vals.get("parate", 0)), key=f"par_{partita_sel}_{i}")
                     with c3:
@@ -1130,9 +1134,10 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                     
                     temp_dict = {"minuti": minuti, "parate": parate, "uscite": uscite, "gol_subiti_resp": gol_subiti_resp}
                     voto_live = calcola_voto(temp_dict, is_portiere=True)
+                    voto_live_txt = str(voto_live) if voto_live is not None else "N.D."
                     
                     with c_voto:
-                        st.markdown(f"<div class='scoutai-voto-box'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live}</span></div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='scoutai-voto-box'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live_txt}</span></div>", unsafe_allow_html=True)
 
                     p_dati["dati_prestazione"][nome_g] = temp_dict
                 else:
@@ -1146,7 +1151,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
 
                     c1, c2, c3, c4, c5, c6, c_voto = st.columns([1, 1, 1.3, 0.8, 1, 0.8, 1])
                     with c1:
-                        minuti = st.number_input("Minuti", 1, 80, int(current_vals.get("minuti", 80)), key=f"min_{partita_sel}_{i}")
+                        minuti = st.number_input("Minuti", 0, 80, int(current_vals.get("minuti", 80)), key=f"min_{partita_sel}_{i}")
                     with c2:
                         duelli = st.text_input("Duelli V/T", str(current_vals.get("duelli", "5/5")), key=f"due_{partita_sel}_{i}")
                     with c3:
@@ -1166,9 +1171,10 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                         "perse": perse, "tiri": tiri, "gol_fatti": gol_fatti, "salvataggi": 0
                     }
                     voto_live = calcola_voto(temp_dict, is_portiere=False)
+                    voto_live_txt = str(voto_live) if voto_live is not None else "N.D."
                     
                     with c_voto:
-                        st.markdown(f"<div class='scoutai-voto-box'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live}</span></div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='scoutai-voto-box'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live_txt}</span></div>", unsafe_allow_html=True)
 
                     p_dati["dati_prestazione"][nome_g] = temp_dict
 
@@ -1199,9 +1205,10 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                     
                     temp_dict_res = {"minuti": minuti, "parate": parate, "uscite": uscite, "gol_subiti_resp": gol_subiti_resp}
                     voto_live_res = calcola_voto(temp_dict_res, is_portiere=True)
+                    voto_live_res_txt = str(voto_live_res) if voto_live_res is not None else "N.D."
                     
                     with c_voto:
-                        st.markdown(f"<div class='scoutai-voto-box'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live_res}</span></div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='scoutai-voto-box'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live_res_txt}</span></div>", unsafe_allow_html=True)
 
                     p_dati["dati_prestazione"][nome_g] = temp_dict_res
                 else:
@@ -1235,9 +1242,10 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                         "perse": perse, "tiri": tiri, "gol_fatti": gol_fatti, "salvataggi": 0
                     }
                     voto_live_res = calcola_voto(temp_dict_res, is_portiere=False)
+                    voto_live_res_txt = str(voto_live_res) if voto_live_res is not None else "N.D."
                     
                     with c_voto:
-                        st.markdown(f"<div class='scoutai-voto-box'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live_res}</span></div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='scoutai-voto-box'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live_res_txt}</span></div>", unsafe_allow_html=True)
 
                     p_dati["dati_prestazione"][nome_g] = temp_dict_res
 
@@ -1268,7 +1276,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 is_portiere = (str(n) in ["1", "12"])
                 p_dati_g = p_dati["dati_prestazione"].get(nome, {})
                 voto = calcola_voto(p_dati_g, is_portiere)
-                righe_csv.append({"Numero": n, "Giocatore": nome, **p_dati_g, "Voto": voto})
+                righe_csv.append({"Numero": n, "Giocatore": nome, **p_dati_g, "Voto": voto if voto is not None else "N.D."})
             
             df_match = pd.DataFrame(righe_csv)
             if not df_match.empty:
@@ -1402,17 +1410,19 @@ elif menu == "📈 Riepilogo Squadra":
             if not nome: continue
             is_portiere = (str(n) in ["1", "12"])
             d_p = p_val.get("dati_prestazione", {}).get(nome, {})
-            if d_p:
-                voti_match.append(calcola_voto(d_p, is_portiere))
+            if d_p and int(d_p.get("minuti", 0)) > 0:
+                v_g = calcola_voto(d_p, is_portiere)
+                if v_g is not None:
+                    voti_match.append(v_g)
         
-        voto_medio = round(sum(voti_match)/len(voti_match), 1) if voti_match else 6.0
+        voto_medio = round(sum(voti_match)/len(voti_match), 1) if voti_match else None
         partite_riepilogo.append({
             "Partita": p_nome, 
             "Data": p_val["data"], 
             "Risultato": p_val.get("risultato", "N.D."), 
             "Casa/Trasferta": p_val.get("casa_trasferta", "Casa"),
             "Modulo": p_val["modulo"], 
-            "Voto Medio Squadra": f"{voto_medio} / 10"
+            "Voto Medio Squadra": f"{voto_medio} / 10" if voto_medio is not None else "N.D."
         })
     
     if partite_riepilogo:
@@ -1471,9 +1481,10 @@ elif menu == "📈 Riepilogo Squadra":
                     min_giocati = int(d_p.get("minuti", 0))
                     num_maglia = int(n) if str(n).isdigit() else 0
                     is_portiere = (str(n) in ["1", "12"])
-                    voto_match = calcola_voto(d_p, is_portiere)
+                    ha_minuti = min_giocati > 0
+                    voto_match = calcola_voto(d_p, is_portiere) if ha_minuti else None
 
-                    if min_giocati > 0:
+                    if ha_minuti and voto_match is not None:
                         storico_voti.append(voto_match)
                         tot_minuti += min_giocati
 
@@ -1534,16 +1545,16 @@ elif menu == "📈 Riepilogo Squadra":
                         "Ruolo": ruolo_match,
                         "Minuti": f"{min_giocati}'",
                         "Parametri": parametri_str,
-                        "Voto": f"{voto_match} / 10"
+                        "Voto": f"{voto_match} / 10" if voto_match is not None else "N.D. (0')"
                     })
 
     tot_presenze = presenze_titolare + presenze_subentro
-    media_stagione = round(sum(storico_voti)/len(storico_voti), 1) if storico_voti else 6.0
+    media_stagione = round(sum(storico_voti)/len(storico_voti), 1) if storico_voti else None
     trend = calcola_trend_giocatore(storico_voti)
 
     c1, c2, c3 = st.columns(3)
     c1.metric("Partite Votate", len(storico_voti))
-    c2.metric("Media Voto Stagionale", f"{media_stagione} / 10")
+    c2.metric("Media Voto Stagionale", f"{media_stagione} / 10" if media_stagione is not None else "N.D.")
     c3.metric("Trend di Rendimento", trend)
 
     st.markdown("<br>", unsafe_allow_html=True)
