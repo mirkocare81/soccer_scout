@@ -28,6 +28,37 @@ st.set_page_config(
 )
 
 # =====================================================================
+# COSTANTI RUOLI IN CAMPO
+# =====================================================================
+RUOLI_DIFENSORI = ["TS", "DC", "TD"]
+RUOLI_CENTROCAMPISTI = ["CDC", "CC", "TQ"]
+RUOLI_ATTACCANTI = ["AS", "AT", "AD"]
+TUTTI_RUOLI_MOVIMENTO = RUOLI_DIFENSORI + RUOLI_CENTROCAMPISTI + RUOLI_ATTACCANTI
+
+def get_macro_ruolo(ruolo_specifico):
+    if ruolo_specifico in RUOLI_DIFENSORI:
+        return "DIFENSORE"
+    elif ruolo_specifico in RUOLI_CENTROCAMPISTI:
+        return "CENTROCAMPISTA"
+    elif ruolo_specifico in RUOLI_ATTACCANTI:
+        return "ATTACCANTE"
+    return "CENTROCAMPISTA"
+
+def ruolo_default_da_rosa(ruolo_rosa_str):
+    r = (ruolo_rosa_str or "").upper()
+    if "TERZINO" in r or "TS" in r or "TD" in r:
+        return "TD" if "TD" in r else "TS"
+    if "DIFENSORE" in r or "DC" in r:
+        return "DC"
+    if "ATTACCANTE" in r or "EST" in r or "AT" in r:
+        return "AT"
+    if "CDC" in r:
+        return "CDC"
+    if "TQ" in r:
+        return "TQ"
+    return "CC"
+
+# =====================================================================
 # GESTIONE LOGO & FILE PERSISTENTI (JSON)
 # =====================================================================
 LOGO_PATH = "Channel logo.jpg" if os.path.exists("Channel logo.jpg") else ("logo.png" if os.path.exists("logo.png") else None)
@@ -216,7 +247,7 @@ with col_title_h:
 st.divider()
 
 # =====================================================================
-# MOTORE DI CALCOLO VOTO & TREND
+# MOTORE DI CALCOLO VOTO & TREND (PESATO PER RUOLO)
 # =====================================================================
 def calcola_voto(p, is_portiere=False):
     try:
@@ -240,6 +271,9 @@ def calcola_voto(p, is_portiere=False):
             rating -= (gol_subiti * 0.4) * fattore_tempo
             rating -= (gol_resp * 1.0) * fattore_tempo
         else:
+            ruolo_campo = p.get("ruolo_campo", "CC")
+            macro_ruolo = get_macro_ruolo(ruolo_campo)
+
             duelli_v, duelli_t = map(int, p.get('duelli', '0/0').split("/"))
             pct_passaggi = float(p.get('passaggi', 75)) / 100.0
             perse = int(p.get('perse', 0))
@@ -248,24 +282,56 @@ def calcola_voto(p, is_portiere=False):
 
             pct_duelli = (duelli_v / duelli_t) if duelli_t > 0 else 0
 
-            if pct_duelli >= 0.75 and duelli_t >= 3:
-                rating += 0.4 * min(1.0, fattore_tempo + 0.2)
-            elif pct_duelli < 0.40:
-                rating -= 0.4 * fattore_tempo
+            # Pesi parametri per macro-ruolo
+            if macro_ruolo == "DIFENSORE":
+                # Difensori: pesano molto i duelli, meno passaggi, perse e tiri
+                peso_duelli = 1.8
+                peso_passaggi = 0.5
+                peso_perse = 0.5
+                peso_tiri = 0.5
+                soglia_duelli_min = 2
+            elif macro_ruolo == "CENTROCAMPISTA":
+                # Centrocampisti: pesano molto palle perse e passaggi, meno duelli e tiri
+                peso_duelli = 0.7
+                peso_passaggi = 1.7
+                peso_perse = 1.7
+                peso_tiri = 0.6
+                soglia_duelli_min = 3
+            else:
+                # Attaccanti: pesano molto i tiri, meno duelli, passaggi e perse
+                peso_duelli = 0.6
+                peso_passaggi = 0.5
+                peso_perse = 0.6
+                peso_tiri = 1.9
+                soglia_duelli_min = 2
 
+            # 1. Duelli
+            if pct_duelli >= 0.75 and duelli_t >= soglia_duelli_min:
+                rating += (0.4 * peso_duelli) * min(1.0, fattore_tempo + 0.2)
+            elif pct_duelli >= 0.55 and duelli_t >= soglia_duelli_min and macro_ruolo == "DIFENSORE":
+                rating += (0.2 * peso_duelli) * fattore_tempo
+            elif pct_duelli < 0.40 and duelli_t > 0:
+                rating -= (0.4 * peso_duelli) * fattore_tempo
+
+            # 2. Passaggi %
             if pct_passaggi >= 0.85:
-                rating += 0.3
+                rating += 0.3 * peso_passaggi
             elif pct_passaggi < 0.50:
-                rating -= 0.3 * fattore_tempo
+                rating -= (0.3 * peso_passaggi) * fattore_tempo
 
+            # 3. Palle perse
             if perse > 0:
-                rating -= (perse * 0.6) * fattore_tempo
+                rating -= (perse * 0.6 * peso_perse) * fattore_tempo
 
+            # 4. Tiri (Porta / Specchio)
             if tiri_specchio > 0:
                 efficacia = tiri_porta / tiri_specchio
                 if efficacia >= 0.66:
-                    rating += 0.4 * fattore_tempo
+                    rating += (0.4 * peso_tiri) * fattore_tempo
+                elif tiri_specchio >= 2 and efficacia < 0.30:
+                    rating -= (0.2 * peso_tiri) * fattore_tempo
 
+            # 5. Gol fatti (+1 per tutti)
             if gol_fatti > 0:
                 rating += (gol_fatti * 1.0)
 
@@ -308,12 +374,12 @@ def genera_pdf_partita(match_name, match_data, db_giocatori, accent_hex):
         p_dati = match_data.get("dati_prestazione", {}).get(nome, {})
         is_portiere = (str(num) in ["1", "12"])
         voto = calcola_voto(p_dati, is_portiere) if p_dati else "N.D."
-        ruolo = db_giocatori.get(nome, {}).get("ruolo", "Portiere" if is_portiere else "Movimento")
+        ruolo = p_dati.get("ruolo_campo") or db_giocatori.get(nome, {}).get("ruolo", "Portiere" if is_portiere else "Movimento")
         
         if is_portiere:
             stats = f"Parate: {p_dati.get('parate', 0)} | Uscite: {p_dati.get('uscite', '0/0')} | Gol Sub./Resp.: {p_dati.get('gol_subiti_resp', '0/0')}"
         else:
-            stats = f"Duelli: {p_dati.get('duelli', '0/0')} | Pass: {p_dati.get('passaggi', 75)}% | Gol: {p_dati.get('gol_fatti', 0)}"
+            stats = f"Duelli: {p_dati.get('duelli', '0/0')} | Pass: {p_dati.get('passaggi', 75)}% | Perse: {p_dati.get('perse', 0)} | Tiri: {p_dati.get('tiri', '0/0')} | Gol: {p_dati.get('gol_fatti', 0)}"
 
         t_data.append([str(num), nome, ruolo, f"{p_dati.get('minuti', 80)}'", stats, str(voto)])
 
@@ -349,7 +415,6 @@ menu = st.sidebar.radio("Navigazione", [
     "🎨 Editor Grafica"
 ])
 
-# Lista partite ordinata cronologicamente (dal più vecchio al più recente)
 partite_ordinate_chiavi = [
     item[0] for item in sorted(
         db_partite.items(),
@@ -358,7 +423,7 @@ partite_ordinate_chiavi = [
 ]
 
 # =====================================================================
-# 1. SETUP PARTITE & FORMAZIONI (ORDINATO CRONOLOGICAMENTE)
+# 1. SETUP PARTITE & FORMAZIONI
 # =====================================================================
 if menu == "📋 Setup Partite & Formazioni":
     st.title("📋 Setup Partite & Formazioni Titolari / Riserve")
@@ -469,7 +534,7 @@ if menu == "📋 Setup Partite & Formazioni":
                 st.rerun()
 
 # =====================================================================
-# 2. INSERIMENTO PARAMETRI & VOTI
+# 2. INSERIMENTO PARAMETRI & VOTI (CON RUOLO SPECIFICO & PESI DEDICATI)
 # =====================================================================
 elif menu == "⚡ Inserimento Parametri & Voti":
     st.title("⚡ Inserimento Parametri Post-Partita & Voti")
@@ -485,6 +550,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
         p_dati["dati_prestazione"] = {}
 
     st.subheader(f"Analisi Match: {partita_sel} (Risultato: {p_dati.get('risultato', 'N.D.')} | {p_dati.get('casa_trasferta', 'Casa')})")
+    st.caption("Pesi voto: Difensori (TS, DC, TD) → focus Duelli | Centrocampisti (CDC, CC, TQ) → focus Passaggi & Perse | Attaccanti (AS, AT, AD) → focus Tiri | Gol = +1 per tutti.")
 
     with st.form("form_inserimento_parametri"):
         passaggi_opt = [100, 75, 50, 25, 10]
@@ -495,13 +561,11 @@ elif menu == "⚡ Inserimento Parametri & Voti":
             if not nome_g: continue
             
             is_portiere = (i == 1)
-            role_text = "PORTIERE" if is_portiere else "MOVIMENTO"
-            st.markdown(f"**N° {i} — {nome_g}** *({role_text})*")
-            
+            default_ruolo_g = ruolo_default_da_rosa(db_giocatori.get(nome_g, {}).get("ruolo", ""))
+            current_vals = p_dati["dati_prestazione"].get(nome_g, {})
+
             if is_portiere:
-                current_vals = p_dati["dati_prestazione"].get(nome_g, {
-                    "minuti": 80, "parate": 0, "uscite": "0/1", "gol_subiti_resp": "0/0"
-                })
+                st.markdown(f"**N° {i} — {nome_g}** *(PORTIERE)*")
                 c1, c2, c3, c4, c_voto = st.columns([1.5, 1.5, 1.5, 1.5, 1])
                 with c1:
                     minuti = st.number_input("Minuti", 1, 80, int(current_vals.get("minuti", 80)), key=f"min_{partita_sel}_{i}")
@@ -520,9 +584,14 @@ elif menu == "⚡ Inserimento Parametri & Voti":
 
                 p_dati["dati_prestazione"][nome_g] = temp_dict
             else:
-                current_vals = p_dati["dati_prestazione"].get(nome_g, {
-                    "minuti": 80, "duelli": "5/5", "passaggi": 75, "perse": 0, "tiri": "0/0", "gol_fatti": 0
-                })
+                c_gioc, c_ruolo = st.columns([2.2, 1.2])
+                with c_gioc:
+                    st.markdown(f"<div style='padding-top: 6px;'><strong>N° {i} — {nome_g}</strong></div>", unsafe_allow_html=True)
+                with c_ruolo:
+                    val_ruolo = current_vals.get("ruolo_campo", default_ruolo_g)
+                    idx_ruolo = TUTTI_RUOLI_MOVIMENTO.index(val_ruolo) if val_ruolo in TUTTI_RUOLI_MOVIMENTO else TUTTI_RUOLI_MOVIMENTO.index("CC")
+                    ruolo_campo = st.selectbox("Ruolo", TUTTI_RUOLI_MOVIMENTO, index=idx_ruolo, key=f"ruolo_{partita_sel}_{i}", label_visibility="collapsed")
+
                 c1, c2, c3, c4, c5, c6, c_voto = st.columns([1, 1, 1, 0.8, 1, 0.8, 1])
                 with c1:
                     minuti = st.number_input("Minuti", 1, 80, int(current_vals.get("minuti", 80)), key=f"min_{partita_sel}_{i}")
@@ -539,7 +608,11 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 with c6:
                     gol_fatti = st.number_input("Gol", 0, 5, int(current_vals.get("gol_fatti", 0)), key=f"gol_{partita_sel}_{i}")
                 
-                temp_dict = {"minuti": minuti, "duelli": duelli, "passaggi": passaggi, "perse": perse, "tiri": tiri, "gol_fatti": gol_fatti, "salvataggi": 0}
+                temp_dict = {
+                    "ruolo_campo": ruolo_campo,
+                    "minuti": minuti, "duelli": duelli, "passaggi": passaggi,
+                    "perse": perse, "tiri": tiri, "gol_fatti": gol_fatti, "salvataggi": 0
+                }
                 voto_live = calcola_voto(temp_dict, is_portiere=False)
                 
                 with c_voto:
@@ -557,13 +630,11 @@ elif menu == "⚡ Inserimento Parametri & Voti":
             if not nome_g: continue
             
             is_portiere = (i == 12)
-            role_text_res = "PORTIERE" if is_portiere else "MOVIMENTO"
-            st.markdown(f"**N° {i} — {nome_g} (Riserva)** *({role_text_res})*")
-            
+            default_ruolo_g = ruolo_default_da_rosa(db_giocatori.get(nome_g, {}).get("ruolo", ""))
+            current_vals = p_dati["dati_prestazione"].get(nome_g, {})
+
             if is_portiere:
-                current_vals = p_dati["dati_prestazione"].get(nome_g, {
-                    "minuti": 0, "parate": 0, "uscite": "0/0", "gol_subiti_resp": "0/0"
-                })
+                st.markdown(f"**N° {i} — {nome_g} (Riserva)** *(PORTIERE)*")
                 c1, c2, c3, c4, c_voto = st.columns([1.5, 1.5, 1.5, 1.5, 1])
                 with c1:
                     minuti = st.number_input("Min sub", 0, 80, int(current_vals.get("minuti", 0)), key=f"min_res_{partita_sel}_{i}")
@@ -582,9 +653,14 @@ elif menu == "⚡ Inserimento Parametri & Voti":
 
                 p_dati["dati_prestazione"][nome_g] = temp_dict_res
             else:
-                current_vals = p_dati["dati_prestazione"].get(nome_g, {
-                    "minuti": 0, "duelli": "0/0", "passaggi": 75, "perse": 0, "tiri": "0/0", "gol_fatti": 0
-                })
+                c_gioc, c_ruolo = st.columns([2.2, 1.2])
+                with c_gioc:
+                    st.markdown(f"<div style='padding-top: 6px;'><strong>N° {i} — {nome_g} (Riserva)</strong></div>", unsafe_allow_html=True)
+                with c_ruolo:
+                    val_ruolo = current_vals.get("ruolo_campo", default_ruolo_g)
+                    idx_ruolo = TUTTI_RUOLI_MOVIMENTO.index(val_ruolo) if val_ruolo in TUTTI_RUOLI_MOVIMENTO else TUTTI_RUOLI_MOVIMENTO.index("CC")
+                    ruolo_campo = st.selectbox("Ruolo", TUTTI_RUOLI_MOVIMENTO, index=idx_ruolo, key=f"ruolo_res_{partita_sel}_{i}", label_visibility="collapsed")
+
                 c1, c2, c3, c4, c5, c6, c_voto = st.columns([1, 1, 1, 0.8, 1, 0.8, 1])
                 with c1:
                     minuti = st.number_input("Min sub", 0, 80, int(current_vals.get("minuti", 0)), key=f"min_res_{partita_sel}_{i}")
@@ -601,7 +677,11 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 with c6:
                     gol_fatti = st.number_input("Gol", 0, 5, int(current_vals.get("gol_fatti", 0)), key=f"gol_res_{partita_sel}_{i}")
                 
-                temp_dict_res = {"minuti": minuti, "duelli": duelli, "passaggi": passaggi, "perse": perse, "tiri": tiri, "gol_fatti": gol_fatti, "salvataggi": 0}
+                temp_dict_res = {
+                    "ruolo_campo": ruolo_campo,
+                    "minuti": minuti, "duelli": duelli, "passaggi": passaggi,
+                    "perse": perse, "tiri": tiri, "gol_fatti": gol_fatti, "salvataggi": 0
+                }
                 voto_live_res = calcola_voto(temp_dict_res, is_portiere=False)
                 
                 with c_voto:
