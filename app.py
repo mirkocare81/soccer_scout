@@ -587,7 +587,7 @@ if not st.session_state["home_entered"]:
         [data-testid="stSidebar"] {{ display: none !important; }}
         header {{ visibility: hidden !important; }}
         .scoutai-home-banner {{
-            max-width: 860px;
+            max-width: 1060px;
             margin: 0.5rem auto 0.75rem auto;
             padding: 14px 18px;
             text-align: center;
@@ -606,7 +606,7 @@ if not st.session_state["home_entered"]:
         }}
         .scoutai-home-title {{
             margin: 0;
-            font-size: clamp(17px, 2.2vw, 24px);
+            font-size: clamp(15px, 2.2vw, 18px);
             font-weight: 500;
             line-height: 1.2;
             color: {tema['text_color']} !important;
