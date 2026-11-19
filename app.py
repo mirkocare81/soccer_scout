@@ -732,4 +732,751 @@ if menu == "📋 Setup Partite & Formazioni":
     col_sel_p, col_new_p, col_del_p = st.columns([3, 0.4, 0.4])
     with col_sel_p:
         partita_selezionata = selettore_partita_persistente("Seleziona Partita", "sel_partita_setup")
-    with col_
+    with col_new_p:
+        st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+        with st.expander("➕"):
+            with st.form("form_nuova_partita"):
+                n_avv = st.text_input("Squadra Avversaria")
+                n_data = st.text_input("Data (es. 29/03/2026)")
+                n_mod = st.selectbox("Modulo Titolari", ["4-4-2", "4-3-3", "3-5-2", "4-2-3-1"])
+                n_ris = st.text_input("Risultato (es. 2-1)", value="N.D.")
+                n_ct = st.selectbox("Casa / Trasferta", ["Casa", "Trasferta"])
+                if st.form_submit_button("💾") and n_avv:
+                    nome_p = f"{n_avv} ({n_data})"
+                    if nome_p not in db_partite:
+                        db_partite[nome_p] = {
+                            "avversario": n_avv, "data": n_data, "modulo": n_mod,
+                            "risultato": n_ris, "casa_trasferta": n_ct, "youtube_link": "",
+                            "formazione": {str(i): "" for i in range(1, 21)},
+                            "dati_prestazione": {}
+                        }
+                        st.session_state["partita_attiva"] = nome_p
+                        salva_dati_su_disco()
+                        st.success(f"Partita {nome_p} creata!")
+                        st.rerun()
+    with col_del_p:
+        st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+        with st.expander("➖"):
+            if db_partite and partita_selezionata in db_partite:
+                st.warning(f"Eliminare '{partita_selezionata}'?")
+                if st.button("🗑️ Conferma"):
+                    del db_partite[partita_selezionata]
+                    rimanenti = sorted(
+                        db_partite.keys(),
+                        key=lambda k: parse_data_partita(db_partite[k].get("data", "01/01/2026"))
+                    )
+                    st.session_state["partita_attiva"] = rimanenti[0] if rimanenti else None
+                    salva_dati_su_disco()
+                    st.success("Partita eliminata!")
+                    st.rerun()
+            else:
+                st.info("Nessuna partita.")
+
+    if db_partite and partita_selezionata in db_partite:
+        p_info = db_partite[partita_selezionata]
+        
+        if "risultato" not in p_info: p_info["risultato"] = "N.D."
+        if "casa_trasferta" not in p_info: p_info["casa_trasferta"] = "Casa"
+        if "youtube_link" not in p_info: p_info["youtube_link"] = ""
+        if "dati_prestazione" not in p_info: p_info["dati_prestazione"] = {}
+
+        st.divider()
+        st.subheader(f"⚙️ Configurazione Partita & Formazione: {partita_selezionata}")
+
+        with st.form(f"config_partita_{partita_selezionata}"):
+            c_avv, c_res, c_ct, c_mod = st.columns(4)
+            with c_avv:
+                nuovo_avv = st.text_input("Squadra Avversaria", value=p_info.get("avversario", ""))
+            with c_res:
+                nuovo_risultato = st.text_input("Risultato (es. 3-1)", value=p_info.get("risultato", "N.D."))
+            with c_ct:
+                ct_opts = ["Casa", "Trasferta"]
+                idx_ct = ct_opts.index(p_info.get("casa_trasferta", "Casa")) if p_info.get("casa_trasferta", "Casa") in ct_opts else 0
+                nuovo_ct = st.selectbox("Casa / Trasferta", ct_opts, index=idx_ct)
+            with c_mod:
+                moduli_disponibili = ["4-4-2", "4-3-3", "3-5-2", "4-2-3-1"]
+                idx_mod = moduli_disponibili.index(p_info["modulo"]) if p_info["modulo"] in moduli_disponibili else 0
+                nuovo_modulo = st.selectbox("Modulo di Gioco", moduli_disponibili, index=idx_mod)
+
+            st.info("ℹ️ I numeri **1** e **12** sono assegnati ai Portieri. I giocatori già inseriti in formazione vengono automaticamente esclusi dalle tendine per evitare duplicati.")
+
+            tutta_rosa = list(db_giocatori.keys())
+            formazione_corrente = p_info.get("formazione", {})
+
+            st.markdown("### 🔴 Titolari (Maglie 1 - 11)")
+            cols_tit = st.columns(4)
+            for i in range(1, 12):
+                with cols_tit[(i-1) % 4]:
+                    curr_val = formazione_corrente.get(str(i), formazione_corrente.get(i, ""))
+                    selezionati_altrove = [
+                        val for k, val in formazione_corrente.items() 
+                        if str(k) != str(i) and val != ""
+                    ]
+                    opzioni_slot = [""] + [g for g in tutta_rosa if g not in selezionati_altrove or g == curr_val]
+                    idx_val = opzioni_slot.index(curr_val) if curr_val in opzioni_slot else 0
+                    label_ruolo = "PORTIERE" if i == 1 else "Titolare"
+                    p_info["formazione"][str(i)] = st.selectbox(f"N° {i} ({label_ruolo})", opzioni_slot, index=idx_val, key=f"tit_{i}_{partita_selezionata}")
+
+            st.markdown("### 🔵 Riserve / Panchina (Maglie 12 - 20)")
+            cols_res = st.columns(3)
+            for i in range(12, 21):
+                with cols_res[(i-12) % 3]:
+                    curr_val = formazione_corrente.get(str(i), formazione_corrente.get(i, ""))
+                    selezionati_altrove = [
+                        val for k, val in formazione_corrente.items() 
+                        if str(k) != str(i) and val != ""
+                    ]
+                    opzioni_slot = [""] + [g for g in tutta_rosa if g not in selezionati_altrove or g == curr_val]
+                    idx_val = opzioni_slot.index(curr_val) if curr_val in opzioni_slot else 0
+                    label_ruolo = "PORTIERE RIS." if i == 12 else "Riserva"
+                    p_info["formazione"][str(i)] = st.selectbox(f"N° {i} ({label_ruolo})", opzioni_slot, index=idx_val, key=f"res_{i}_{partita_selezionata}")
+
+            if st.form_submit_button("Conferma e Salva Dati Partita"):
+                p_info["avversario"] = nuovo_avv
+                p_info["risultato"] = nuovo_risultato
+                p_info["casa_trasferta"] = nuovo_ct
+                p_info["modulo"] = nuovo_modulo
+                st.session_state["partita_attiva"] = partita_selezionata
+                salva_dati_su_disco()
+                st.success("Dati partita e formazione salvati con successo!")
+                st.rerun()
+
+# =====================================================================
+# 2. INSERIMENTO PARAMETRI & VOTI
+# =====================================================================
+elif menu == "⚡ Inserimento Parametri & Voti":
+    st.title("⚡ Inserimento Parametri Post-Partita & Voti")
+
+    if not db_partite:
+        st.warning("⚠️ Crea prima una partita nella sezione 'Setup Partite & Formazioni'.")
+        st.stop()
+
+    partita_sel = selettore_partita_persistente("Seleziona Partita da Analizzare", "analizza_partita")
+    p_dati = db_partite[partita_sel]
+
+    if "dati_prestazione" not in p_dati:
+        p_dati["dati_prestazione"] = {}
+
+    col_tit_sez, col_btn_reset = st.columns([3.5, 1])
+    with col_tit_sez:
+        st.subheader(f"Analisi Match: {partita_sel} (Risultato: {p_dati.get('risultato', 'N.D.')} | {p_dati.get('casa_trasferta', 'Casa')})")
+    with col_btn_reset:
+        st.markdown("<div style='height: 18px;'></div>", unsafe_allow_html=True)
+        if st.button("🔄 Ripristina valori", use_container_width=True, key=f"btn_ripristina_valori_{partita_sel}"):
+            ripristina_parametri_partita(partita_sel, p_dati, db_giocatori)
+            st.success("Valori ripristinati ai dati base (ruoli mantenuti)!")
+            st.rerun()
+
+    st.caption("Efficacia passaggi: Ottima (+0,7) · Buona (+0,4) · Sufficiente (+0,1) · Insufficiente (-0,3) · Pessima (-0,5), pesata sul ruolo. Gol = +1 per tutti.")
+
+    with st.form("form_inserimento_parametri"):
+        st.markdown("### 🔴 TITOLARI (Maglie 1 - 11)")
+        for i in range(1, 12):
+            nome_g = p_dati["formazione"].get(str(i), p_dati["formazione"].get(i, ""))
+            if not nome_g: continue
+            
+            is_portiere = (i == 1)
+            default_ruolo_g = ruolo_default_da_rosa(db_giocatori.get(nome_g, {}).get("ruolo", ""))
+            current_vals = p_dati["dati_prestazione"].get(nome_g, {})
+
+            if is_portiere:
+                st.markdown(f"**N° {i} — {nome_g}** *(PORTIERE)*")
+                c1, c2, c3, c4, c_voto = st.columns([1.5, 1.5, 1.5, 1.5, 1])
+                with c1:
+                    minuti = st.number_input("Minuti", 1, 80, int(current_vals.get("minuti", 80)), key=f"min_{partita_sel}_{i}")
+                with c2:
+                    parate = st.number_input("Parate", 0, 20, int(current_vals.get("parate", 0)), key=f"par_{partita_sel}_{i}")
+                with c3:
+                    uscite = st.text_input("Uscite tent./rius.", str(current_vals.get("uscite", "0/1")), key=f"usc_{partita_sel}_{i}")
+                with c4:
+                    gol_subiti_resp = st.text_input("Gol sub./resp.", str(current_vals.get("gol_subiti_resp", "0/0")), key=f"gol_sub_{partita_sel}_{i}")
+                
+                temp_dict = {"minuti": minuti, "parate": parate, "uscite": uscite, "gol_subiti_resp": gol_subiti_resp}
+                voto_live = calcola_voto(temp_dict, is_portiere=True)
+                
+                with c_voto:
+                    st.markdown(f"<div class='scoutai-voto-box'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live}</span></div>", unsafe_allow_html=True)
+
+                p_dati["dati_prestazione"][nome_g] = temp_dict
+            else:
+                c_gioc, c_ruolo = st.columns([2.2, 1.2])
+                with c_gioc:
+                    st.markdown(f"<div style='padding-top: 6px;'><strong>N° {i} — {nome_g}</strong></div>", unsafe_allow_html=True)
+                with c_ruolo:
+                    val_ruolo = current_vals.get("ruolo_campo", default_ruolo_g)
+                    idx_ruolo = TUTTI_RUOLI_MOVIMENTO.index(val_ruolo) if val_ruolo in TUTTI_RUOLI_MOVIMENTO else TUTTI_RUOLI_MOVIMENTO.index("CC")
+                    ruolo_campo = st.selectbox("Ruolo", TUTTI_RUOLI_MOVIMENTO, index=idx_ruolo, key=f"ruolo_{partita_sel}_{i}", label_visibility="collapsed")
+
+                c1, c2, c3, c4, c5, c6, c_voto = st.columns([1, 1, 1.3, 0.8, 1, 0.8, 1])
+                with c1:
+                    minuti = st.number_input("Minuti", 1, 80, int(current_vals.get("minuti", 80)), key=f"min_{partita_sel}_{i}")
+                with c2:
+                    duelli = st.text_input("Duelli V/T", str(current_vals.get("duelli", "5/5")), key=f"due_{partita_sel}_{i}")
+                with c3:
+                    val_eff = normalizza_efficacia_passaggi(current_vals.get("efficacia_passaggi", current_vals.get("passaggi", "Buona")))
+                    idx_eff = OPZIONI_EFFICACIA_PASSAGGI.index(val_eff) if val_eff in OPZIONI_EFFICACIA_PASSAGGI else 1
+                    efficacia_passaggi = st.selectbox("Efficacia passaggi", OPZIONI_EFFICACIA_PASSAGGI, index=idx_eff, key=f"pas_{partita_sel}_{i}")
+                with c4:
+                    perse = st.number_input("Perse", 0, 10, int(current_vals.get("perse", 0)), key=f"per_{partita_sel}_{i}")
+                with c5:
+                    tiri = st.text_input("Tiri P/Sp", str(current_vals.get("tiri", "0/0")), key=f"tir_{partita_sel}_{i}")
+                with c6:
+                    gol_fatti = st.number_input("Gol", 0, 5, int(current_vals.get("gol_fatti", 0)), key=f"gol_{partita_sel}_{i}")
+                
+                temp_dict = {
+                    "ruolo_campo": ruolo_campo,
+                    "minuti": minuti, "duelli": duelli, "efficacia_passaggi": efficacia_passaggi,
+                    "perse": perse, "tiri": tiri, "gol_fatti": gol_fatti, "salvataggi": 0
+                }
+                voto_live = calcola_voto(temp_dict, is_portiere=False)
+                
+                with c_voto:
+                    st.markdown(f"<div class='scoutai-voto-box'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live}</span></div>", unsafe_allow_html=True)
+
+                p_dati["dati_prestazione"][nome_g] = temp_dict
+
+            st.markdown("---")
+
+        st.markdown(f"<br><hr style='border: 2px dashed {accent_hex};'><br>", unsafe_allow_html=True)
+
+        st.markdown("### 🔵 RISERVE / PANCHINA (Maglie 12 - 20)")
+        for i in range(12, 21):
+            nome_g = p_dati["formazione"].get(str(i), p_dati["formazione"].get(i, ""))
+            if not nome_g: continue
+            
+            is_portiere = (i == 12)
+            default_ruolo_g = ruolo_default_da_rosa(db_giocatori.get(nome_g, {}).get("ruolo", ""))
+            current_vals = p_dati["dati_prestazione"].get(nome_g, {})
+
+            if is_portiere:
+                st.markdown(f"**N° {i} — {nome_g} (Riserva)** *(PORTIERE)*")
+                c1, c2, c3, c4, c_voto = st.columns([1.5, 1.5, 1.5, 1.5, 1])
+                with c1:
+                    minuti = st.number_input("Min sub", 0, 80, int(current_vals.get("minuti", 0)), key=f"min_res_{partita_sel}_{i}")
+                with c2:
+                    parate = st.number_input("Parate", 0, 20, int(current_vals.get("parate", 0)), key=f"par_res_{partita_sel}_{i}")
+                with c3:
+                    uscite = st.text_input("Uscite tent./rius.", str(current_vals.get("uscite", "0/0")), key=f"usc_res_{partita_sel}_{i}")
+                with c4:
+                    gol_subiti_resp = st.text_input("Gol sub./resp.", str(current_vals.get("gol_subiti_resp", "0/0")), key=f"gol_sub_res_{partita_sel}_{i}")
+                
+                temp_dict_res = {"minuti": minuti, "parate": parate, "uscite": uscite, "gol_subiti_resp": gol_subiti_resp}
+                voto_live_res = calcola_voto(temp_dict_res, is_portiere=True)
+                
+                with c_voto:
+                    st.markdown(f"<div class='scoutai-voto-box'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live_res}</span></div>", unsafe_allow_html=True)
+
+                p_dati["dati_prestazione"][nome_g] = temp_dict_res
+            else:
+                c_gioc, c_ruolo = st.columns([2.2, 1.2])
+                with c_gioc:
+                    st.markdown(f"<div style='padding-top: 6px;'><strong>N° {i} — {nome_g} (Riserva)</strong></div>", unsafe_allow_html=True)
+                with c_ruolo:
+                    val_ruolo = current_vals.get("ruolo_campo", default_ruolo_g)
+                    idx_ruolo = TUTTI_RUOLI_MOVIMENTO.index(val_ruolo) if val_ruolo in TUTTI_RUOLI_MOVIMENTO else TUTTI_RUOLI_MOVIMENTO.index("CC")
+                    ruolo_campo = st.selectbox("Ruolo", TUTTI_RUOLI_MOVIMENTO, index=idx_ruolo, key=f"ruolo_res_{partita_sel}_{i}", label_visibility="collapsed")
+
+                c1, c2, c3, c4, c5, c6, c_voto = st.columns([1, 1, 1.3, 0.8, 1, 0.8, 1])
+                with c1:
+                    minuti = st.number_input("Min sub", 0, 80, int(current_vals.get("minuti", 0)), key=f"min_res_{partita_sel}_{i}")
+                with c2:
+                    duelli = st.text_input("Duelli V/T", str(current_vals.get("duelli", "0/0")), key=f"due_res_{partita_sel}_{i}")
+                with c3:
+                    val_eff_res = normalizza_efficacia_passaggi(current_vals.get("efficacia_passaggi", current_vals.get("passaggi", "Buona")))
+                    idx_eff_res = OPZIONI_EFFICACIA_PASSAGGI.index(val_eff_res) if val_eff_res in OPZIONI_EFFICACIA_PASSAGGI else 1
+                    efficacia_passaggi = st.selectbox("Efficacia passaggi", OPZIONI_EFFICACIA_PASSAGGI, index=idx_eff_res, key=f"pas_res_{partita_sel}_{i}")
+                with c4:
+                    perse = st.number_input("Perse", 0, 10, int(current_vals.get("perse", 0)), key=f"per_res_{partita_sel}_{i}")
+                with c5:
+                    tiri = st.text_input("Tiri P/Sp", str(current_vals.get("tiri", "0/0")), key=f"tir_res_{partita_sel}_{i}")
+                with c6:
+                    gol_fatti = st.number_input("Gol", 0, 5, int(current_vals.get("gol_fatti", 0)), key=f"gol_res_{partita_sel}_{i}")
+                
+                temp_dict_res = {
+                    "ruolo_campo": ruolo_campo,
+                    "minuti": minuti, "duelli": duelli, "efficacia_passaggi": efficacia_passaggi,
+                    "perse": perse, "tiri": tiri, "gol_fatti": gol_fatti, "salvataggi": 0
+                }
+                voto_live_res = calcola_voto(temp_dict_res, is_portiere=False)
+                
+                with c_voto:
+                    st.markdown(f"<div class='scoutai-voto-box'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live_res}</span></div>", unsafe_allow_html=True)
+
+                p_dati["dati_prestazione"][nome_g] = temp_dict_res
+
+            st.markdown("---")
+
+        if st.form_submit_button("💾 Salva Parametri e Calcola Voti"):
+            st.session_state["partita_attiva"] = partita_sel
+            salva_dati_su_disco()
+            st.success("Parametri salvati automaticamente su disco e voti aggiornati per questa partita!")
+            st.rerun()
+
+    st.divider()
+    st.subheader("📄 Esportazione Report")
+    col_pdf, col_csv = st.columns(2)
+    with col_pdf:
+        if REPORTLAB_AVAILABLE:
+            if st.button("📄 Genera Report PDF Partita"):
+                pdf_path = genera_pdf_partita(partita_sel, p_dati, db_giocatori, accent_hex)
+                if pdf_path and os.path.exists(pdf_path):
+                    with open(pdf_path, "rb") as f:
+                        st.download_button("Scarica PDF Ufficiale", f, file_name=pdf_path, mime="application/pdf")
+        else:
+            st.info("ℹ️ Modulo PDF disabilitato (ReportLab non installato nell'ambiente). Puoi usare l'export CSV.")
+    with col_csv:
+        righe_csv = []
+        for n, nome in p_dati["formazione"].items():
+            if not nome: continue
+            is_portiere = (str(n) in ["1", "12"])
+            p_dati_g = p_dati["dati_prestazione"].get(nome, {})
+            voto = calcola_voto(p_dati_g, is_portiere)
+            righe_csv.append({"Numero": n, "Giocatore": nome, **p_dati_g, "Voto": voto})
+        
+        df_match = pd.DataFrame(righe_csv)
+        if not df_match.empty:
+            csv_data = df_match.to_csv(index=False).encode('utf-8')
+            st.download_button("📊 Esporta CSV Match", csv_data, file_name=f"Match_{partita_sel}.csv", mime="text/csv")
+
+# =====================================================================
+# 3. VIDEO ANALISI
+# =====================================================================
+elif menu == "🎥 Video Analisi":
+    st.title("🎥 Video Analisi & Streaming Partita")
+
+    if not db_partite:
+        st.warning("⚠️ Crea prima una partita nella sezione 'Setup Partite & Formazioni'.")
+        st.stop()
+
+    partita_sel = selettore_partita_persistente("Seleziona Partita per la Video Analisi", "video_partita")
+    p_info = db_partite[partita_sel]
+
+    if "youtube_link" not in p_info:
+        p_info["youtube_link"] = ""
+
+    st.divider()
+
+    col_info1, col_info2, col_info3, col_info4 = st.columns(4)
+    col_info1.metric("Data Partita", p_info.get("data", "N.D."))
+    col_info2.metric("Risultato", p_info.get("risultato", "N.D."))
+    col_info3.metric("Luogo", p_info.get("casa_trasferta", "Casa"))
+    col_info4.metric("Modulo", p_info.get("modulo", "N.D."))
+
+    st.divider()
+
+    col_input_l, col_video_r = st.columns([1.2, 1.8])
+
+    with col_input_l:
+        st.subheader("🔗 Configurazione Link")
+        link_inserito = st.text_input("Inserisci Link YouTube", value=p_info.get("youtube_link", ""), placeholder="https://www.youtube.com/watch?v=...")
+        
+        if st.button("▶️ Play Video", use_container_width=True):
+            p_info["youtube_link"] = link_inserito
+            st.session_state["partita_attiva"] = partita_sel
+            salva_dati_su_disco()
+            st.success("Link aggiornato con successo!")
+            st.rerun()
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.info("💡 **Istruzioni:** Incolla il link del video di YouTube e clicca su **Play Video** per caricarlo nel player a destra.")
+
+    with col_video_r:
+        st.subheader("📺 Main Frame Video")
+        link_corrente = p_info.get("youtube_link", "")
+        yt_id = estrai_youtube_id(link_corrente)
+
+        if yt_id:
+            embed_url = f"https://www.youtube.com/embed/{yt_id}"
+            st.markdown(f"""
+                <div style="position: relative; width: 100%; height: 0; padding-bottom: 56.25%;">
+                    <iframe src="{embed_url}" 
+                            style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: {radius_px}px; border: 1px solid {glow_border_rgba}; box-shadow: {box_shadow_glow};" 
+                            allowfullscreen>
+                    </iframe>
+                </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("""
+                <div class="scoutai-video-empty">
+                    <span style="font-size: 40px; margin-bottom: 10px;">📺</span>
+                    <p style="color: #a0aec0; margin: 0; font-size: 16px;">Nessun video caricato o link YouTube non valido.</p>
+                    <p style="color: #718096; margin-top: 5px; font-size: 13px;">Inserisci un link valido nel pannello a sinistra e premi Play.</p>
+                </div>
+            """, unsafe_allow_html=True)
+
+# =====================================================================
+# 4. RIEPILOGO SQUADRA & GIOCATORI
+# =====================================================================
+elif menu == "📈 Riepilogo Squadra":
+    st.title("📈 Riepilogo Squadra & Statistiche Stagionali")
+
+    st.subheader("🏆 Elenco Partite & Voti Medi Squadra (Dal più vecchio al più recente)")
+    
+    partite_ordinate = sorted(
+        db_partite.items(),
+        key=lambda item: parse_data_partita(item[1].get("data", "01/01/2026"))
+    )
+
+    partite_riepilogo = []
+    for p_nome, p_val in partite_ordinate:
+        voti_match = []
+        for n, nome in p_val.get("formazione", {}).items():
+            if not nome: continue
+            is_portiere = (str(n) in ["1", "12"])
+            d_p = p_val.get("dati_prestazione", {}).get(nome, {})
+            if d_p:
+                voti_match.append(calcola_voto(d_p, is_portiere))
+        
+        voto_medio = round(sum(voti_match)/len(voti_match), 1) if voti_match else 6.0
+        partite_riepilogo.append({
+            "Partita": p_nome, 
+            "Data": p_val["data"], 
+            "Risultato": p_val.get("risultato", "N.D."), 
+            "Casa/Trasferta": p_val.get("casa_trasferta", "Casa"),
+            "Modulo": p_val["modulo"], 
+            "Voto Medio Squadra": f"{voto_medio} / 10"
+        })
+    
+    if partite_riepilogo:
+        st.table(pd.DataFrame(partite_riepilogo))
+
+    st.divider()
+    st.subheader("📊 Riepilogo Stagionale Giocatore")
+    giocatore_sel = st.selectbox("Seleziona Giocatore", list(db_giocatori.keys()) if db_giocatori else ["Nessun Giocatore"])
+    
+    storico_voti = []
+    tot_minuti = 0
+    presenze_titolare = 0
+    presenze_subentro = 0
+
+    tot_duelli_v = 0
+    tot_duelli_t = 0
+    lista_efficacia_passaggi = []
+    tot_perse = 0
+    tot_tiri_p = 0
+    tot_tiri_sp = 0
+    tot_gol = 0
+
+    tot_parate = 0
+    tot_uscite_v = 0
+    tot_uscite_t = 0
+    tot_gol_sub = 0
+    tot_gol_resp = 0
+    ha_dati_portiere = False
+    ha_dati_movimento = False
+    righe_match_giocatore = []
+
+    for p_nome, p_val in partite_ordinate:
+        formazione = p_val.get("formazione", {})
+        for n, nome in formazione.items():
+            if nome == giocatore_sel:
+                d_p = p_val.get("dati_prestazione", {}).get(giocatore_sel, {})
+                if d_p:
+                    min_giocati = int(d_p.get("minuti", 0))
+                    num_maglia = int(n) if str(n).isdigit() else 0
+                    is_portiere = (str(n) in ["1", "12"])
+                    voto_match = calcola_voto(d_p, is_portiere)
+
+                    if min_giocati > 0:
+                        storico_voti.append(voto_match)
+                        tot_minuti += min_giocati
+
+                        if 1 <= num_maglia <= 11:
+                            presenze_titolare += 1
+                        elif 12 <= num_maglia <= 20:
+                            presenze_subentro += 1
+
+                    if "parate" in d_p or "uscite" in d_p or "gol_subiti_resp" in d_p:
+                        ha_dati_portiere = True
+                        parate_m = int(d_p.get("parate", 0))
+                        uscite_m = str(d_p.get("uscite", "0/0"))
+                        gol_sub_resp_m = str(d_p.get("gol_subiti_resp", "0/0"))
+
+                        tot_parate += parate_m
+                        u_v, u_t = parse_frazione(uscite_m)
+                        tot_uscite_v += u_v
+                        tot_uscite_t += u_t
+                        g_s, g_r = parse_frazione(gol_sub_resp_m)
+                        tot_gol_sub += g_s
+                        tot_gol_resp += g_r
+
+                        ruolo_match = "POR"
+                        parametri_str = f"Parate: {parate_m} | Uscite: {uscite_m} | Gol Sub./Resp.: {gol_sub_resp_m}"
+                    else:
+                        ha_dati_movimento = True
+                        duelli_m = str(d_p.get("duelli", "0/0"))
+                        eff_pass_m = normalizza_efficacia_passaggi(
+                            d_p.get("efficacia_passaggi", d_p.get("passaggi", "Buona"))
+                        )
+                        perse_m = int(d_p.get("perse", 0))
+                        tiri_m = str(d_p.get("tiri", "0/0"))
+                        gol_m = int(d_p.get("gol_fatti", 0))
+
+                        d_v, d_t = parse_frazione(duelli_m)
+                        tot_duelli_v += d_v
+                        tot_duelli_t += d_t
+                        lista_efficacia_passaggi.append(eff_pass_m)
+                        tot_perse += perse_m
+                        t_p, t_sp = parse_frazione(tiri_m)
+                        tot_tiri_p += t_p
+                        tot_tiri_sp += t_sp
+                        tot_gol += gol_m
+
+                        ruolo_match = d_p.get("ruolo_campo") or ruolo_default_da_rosa(
+                            db_giocatori.get(giocatore_sel, {}).get("ruolo", "")
+                        )
+                        parametri_str = (
+                            f"Duelli: {duelli_m} | Passaggi: {eff_pass_m} | "
+                            f"Perse: {perse_m} | Tiri: {tiri_m} | Gol: {gol_m}"
+                        )
+
+                    tipo_presenza = "Titolare" if 1 <= num_maglia <= 11 else ("Subentro" if 12 <= num_maglia <= 20 else "Rosa")
+                    righe_match_giocatore.append({
+                        "Partita": p_nome,
+                        "Data": p_val.get("data", "N.D."),
+                        "Presenza": tipo_presenza,
+                        "Ruolo": ruolo_match,
+                        "Minuti": f"{min_giocati}'",
+                        "Parametri": parametri_str,
+                        "Voto": f"{voto_match} / 10"
+                    })
+
+    tot_presenze = presenze_titolare + presenze_subentro
+    media_stagione = round(sum(storico_voti)/len(storico_voti), 1) if storico_voti else 6.0
+    trend = calcola_trend_giocatore(storico_voti)
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Partite Votate", len(storico_voti))
+    c2.metric("Media Voto Stagionale", f"{media_stagione} / 10")
+    c3.metric("Trend di Rendimento", trend)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # 1. Conteggio totale parametri inseriti (PRIMA di presenze e minutaggio)
+    st.markdown(f"""
+    <div class="scoutai-box" style="margin-bottom: 18px;">
+        <h4 style="margin-top: 0; color: {accent_hex}; border-bottom: 1px solid {tema['border_color']}; padding-bottom: 10px;">🧮 Conteggio Totale Parametri Inseriti: {giocatore_sel}</h4>
+    """, unsafe_allow_html=True)
+
+    if ha_dati_movimento:
+        valore_pass_metric = calcola_efficacia_passaggi_media(lista_efficacia_passaggi)
+
+        m1, m2, m3, m4, m5 = st.columns(5)
+        m1.metric("Duelli (V/T)", f"{tot_duelli_v}/{tot_duelli_t}")
+        m2.metric("Efficacia Passaggi", valore_pass_metric)
+        m3.metric("Palle Perse", tot_perse)
+        m4.metric("Tiri (P/Sp)", f"{tot_tiri_p}/{tot_tiri_sp}")
+        m5.metric("Gol Segnati", tot_gol)
+
+    if ha_dati_portiere:
+        p1, p2, p3 = st.columns(3)
+        p1.metric("Parate Totali", tot_parate)
+        p2.metric("Uscite (Rius./Tent.)", f"{tot_uscite_v}/{tot_uscite_t}")
+        p3.metric("Gol Subiti / Respinti", f"{tot_gol_sub}/{tot_gol_resp}")
+
+    if not ha_dati_movimento and not ha_dati_portiere:
+        st.info("Nessun parametro registrato per questo giocatore.")
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # 2. Dettaglio Presenze & Minutaggio (DOPO il conteggio parametri)
+    st.markdown(f"""
+    <div class="scoutai-box" style="margin-bottom: 18px;">
+        <h4 style="margin-top: 0; color: {accent_hex}; border-bottom: 1px solid {tema['border_color']}; padding-bottom: 10px;">📋 Dettaglio Presenze & Minutaggio: {giocatore_sel}</h4>
+        <div style="display: flex; justify-content: space-around; text-align: center; margin-top: 15px;">
+            <div>
+                <span style="font-size: 13px; color: #a0aec0; display: block;">PRESENZE TOTALI</span>
+                <span style="font-size: 24px; font-weight: bold; color: {tema['text_color']};">{tot_presenze}</span>
+            </div>
+            <div>
+                <span style="font-size: 13px; color: #a0aec0; display: block;">DA TITOLARE (1-11)</span>
+                <span style="font-size: 24px; font-weight: bold; color: {accent_hex};">{presenze_titolare}</span>
+            </div>
+            <div>
+                <span style="font-size: 13px; color: #a0aec0; display: block;">SUBENTRI (12-20)</span>
+                <span style="font-size: 24px; font-weight: bold; color: #3b82f6;">{presenze_subentro}</span>
+            </div>
+            <div>
+                <span style="font-size: 13px; color: #a0aec0; display: block;">MINUTI GIOCATI</span>
+                <span style="font-size: 24px; font-weight: bold; color: {accent_hex};">{tot_minuti}'</span>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # 3. Tabella partita per partita del giocatore selezionato
+    st.markdown(f"#### 🗓️ Dettaglio Partita per Partita: {giocatore_sel}")
+    if righe_match_giocatore:
+        st.table(pd.DataFrame(righe_match_giocatore))
+    else:
+        st.info("Nessuna partita con dati registrati per questo giocatore.")
+
+# =====================================================================
+# 5. GESTIONE ROSA
+# =====================================================================
+elif menu == "👤 Gestione Rosa":
+    st.title("👤 Gestione Rosa Squadra")
+
+    st.subheader("📥 Template & Importazione CSV Rosa")
+    col_dl, col_rs = st.columns(2)
+    with col_dl:
+        df_template = pd.DataFrame({
+            "Nome": ["Mario Rossi", "Luigi Bianchi"],
+            "Ruolo": ["Difensore Centrale (DC)", "Portiere (POR)"]
+        })
+        csv_template = df_template.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            "📥 Scarica Template CSV Rosa",
+            data=csv_template,
+            file_name="template_rosa_scoutai.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+    with col_rs:
+        if st.button("🗑️ Resetta Tutta la Rosa", use_container_width=True, type="secondary"):
+            st.session_state["database_giocatori"] = {}
+            salva_dati_su_disco()
+            st.success("Rosa resettata completamente!")
+            st.rerun()
+
+    uploaded_csv = st.file_uploader("📤 Carica file CSV compilato con la nuova rosa", type=["csv"])
+    if uploaded_csv is not None:
+        df_upload = None
+        for enc in ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']:
+            try:
+                uploaded_csv.seek(0)
+                df_upload = pd.read_csv(uploaded_csv, encoding=enc)
+                break
+            except Exception:
+                continue
+        
+        if df_upload is not None:
+            if "Nome" in df_upload.columns and "Ruolo" in df_upload.columns:
+                st.success(f"File CSV letto con successo! Trovati {len(df_upload)} record.")
+                if st.button("✅ Conferma e Sostituisci Rosa con il File Caricato", type="primary"):
+                    nuova_rosa = {}
+                    for _, row in df_upload.iterrows():
+                        nome = str(row["Nome"]).strip()
+                        ruolo = str(row["Ruolo"]).strip()
+                        if nome and nome.lower() != 'nan':
+                            nuova_rosa[nome] = {"ruolo": ruolo, "partite": {}}
+                    st.session_state["database_giocatori"] = nuova_rosa
+                    salva_dati_su_disco()
+                    st.success(f"Rosa aggiornata con successo! Caricati {len(nuova_rosa)} giocatori.")
+                    st.rerun()
+            else:
+                st.error("Il file CSV deve contenere esattamente le colonne 'Nome' e 'Ruolo'.")
+        else:
+            st.error("Errore nella lettura del file CSV: impossibile decodificare il file.")
+
+    st.divider()
+
+    with st.form("aggiungi_giocatore_form"):
+        st.subheader("Aggiungi Singolo Giocatore Manualmente")
+        n_nome = st.text_input("Nome e Cognome")
+        n_ruolo = st.selectbox("Ruolo", ["Portiere (POR)", "Difensore Centrale (DC)", "Terzino (TS/TD)", "Centrocampista (CC)", "Esterno (EST)", "Attaccante (ATT)"])
+        if st.form_submit_button("Aggiungi alla Rosa") and n_nome:
+            if n_nome not in db_giocatori:
+                db_giocatori[n_nome] = {"ruolo": n_ruolo, "partite": {}}
+                salva_dati_su_disco()
+                st.success(f"Giocatore {n_nome} aggiunto e salvato con successo!")
+                st.rerun()
+
+    st.divider()
+    st.subheader("Rosa Attuale")
+    if not db_giocatori:
+        st.info("La rosa è attualmente vuota.")
+    else:
+        for nome, dati in list(db_giocatori.items()):
+            c1, c2 = st.columns([3, 1])
+            with c1:
+                st.markdown(f"<div class='scoutai-box' style='padding: 12px 16px; margin-bottom: 8px;'>📌 <strong>{nome}</strong> — <em>Ruolo:</em> {dati['ruolo']}</div>", unsafe_allow_html=True)
+            with c2:
+                if st.button("🗑️ Elimina", key=f"del_g_{nome}"):
+                    del db_giocatori[nome]
+                    salva_dati_su_disco()
+                    st.success(f"Rimosso {nome} e salvato.")
+                    st.rerun()
+
+# =====================================================================
+# 6. EDITOR GRAFICA & SETTINGS
+# =====================================================================
+elif menu == "🎨 Editor Grafica":
+    st.title("🎨 Editor Grafica & Impostazioni UI")
+
+    if st.session_state.get("ui_notice"):
+        mostra_notifica_tema(st.session_state["ui_notice"], icona="✨")
+        st.session_state["ui_notice"] = None
+
+    st.subheader("🎭 Preset Tema")
+    cols_preset = st.columns(len(PRESET_TEMI))
+    for idx, (n_preset, v_preset) in enumerate(PRESET_TEMI.items()):
+        with cols_preset[idx]:
+            if st.button(n_preset, use_container_width=True, key=f"preset_{idx}"):
+                st.session_state["ui_theme"] = v_preset.copy()
+                salva_dati_su_disco()
+                st.session_state["ui_notice"] = f"Preset '{n_preset}' applicato e salvato con successo."
+                st.rerun()
+
+    st.divider()
+    st.subheader("🎛️ Personalizzazione Font, Glow dei Box & Schermo")
+
+    attiva_fs = st.toggle(
+        "Abilita Modalità Fullscreen (Tutto Schermo)",
+        value=st.session_state["fullscreen_mode"],
+        key="toggle_fs_editor"
+    )
+
+    col_f1, col_f2 = st.columns(2)
+    with col_f1:
+        nuovo_font_size = st.slider(
+            "Dimensione Font (px)",
+            min_value=13,
+            max_value=22,
+            value=int(tema.get("font_size", 16)),
+            step=1,
+            key="slider_font_size"
+        )
+    with col_f2:
+        nuova_ombra = st.slider(
+            "Ombreggiatura Esterna Box (%)",
+            min_value=0,
+            max_value=80,
+            value=int(tema.get("shadow_intensity", 25)),
+            step=5,
+            key="slider_shadow_intensity"
+        )
+
+    col_g1, col_g2 = st.columns(2)
+    with col_g1:
+        nuova_glow_intensita = st.slider(
+            "Intensità Glow Box (%)",
+            min_value=0,
+            max_value=85,
+            value=int(tema.get("glow_intensity", 25)),
+            step=5,
+            key="slider_glow_intensity"
+        )
+    with col_g2:
+        nuova_glow_larghezza = st.slider(
+            "Larghezza Glow Box (px)",
+            min_value=0,
+            max_value=40,
+            value=int(tema.get("glow_width", 14)),
+            step=2,
+            key="slider_glow_width"
+        )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("💾 Salva Impostazioni Grafiche", use_container_width=True, key="btn_salva_grafica"):
+        st.session_state["ui_theme"]["font_size"] = int(nuovo_font_size)
+        st.session_state["ui_theme"]["shadow_intensity"] = int(nuova_ombra)
+        st.session_state["ui_theme"]["glow_intensity"] = int(nuova_glow_intensita)
+        st.session_state["ui_theme"]["glow_width"] = int(nuova_glow_larghezza)
+        st.session_state["fullscreen_mode"] = bool(attiva_fs)
+        salva_dati_su_disco()
+        st.session_state["ui_notice"] = (
+            f"Modifiche salvate e applicate! Font: {nuovo_font_size}px · "
+            f"Glow: {nuova_glow_intensita}% / {nuova_glow_larghezza}px."
+        )
+        st.rerun()
