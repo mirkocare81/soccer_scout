@@ -187,9 +187,11 @@ tema = st.session_state["ui_theme"]
 is_fullscreen = st.session_state["fullscreen_mode"]
 
 # =====================================================================
-# APPLICAZIONE CSS & UI
+# APPLICAZIONE CSS & UI (CON OMBREGGIATURA ESTERNA + LEGGERO GLOW)
 # =====================================================================
 ombra_alfa = tema["shadow_intensity"] / 100.0
+accent_hex = tema["accent"]
+box_shadow_glow = f"0 8px 20px rgba(0, 0, 0, {ombra_alfa}), 0 0 14px {accent_hex}26"
 fullscreen_css = "[data-testid=\"stSidebar\"] {display: none !important;} header {visibility: hidden !important;}" if is_fullscreen else ""
 
 st.markdown(f"""
@@ -200,24 +202,32 @@ st.markdown(f"""
     [data-testid="stSidebar"] {{ background-color: {tema['bg_sidebar']}; border-right: 1px solid {tema['border_color']}; }}
     
     [data-testid="stMetric"], div[data-baseweb="notification"], .stAlert {{
-        background-color: {tema['bg_card']} !important; border: 1px solid {tema['border_color']} !important;
-        color: {tema['text_color']} !important; padding: 18px; border-radius: {tema['border_radius']}px; box-shadow: 0 6px 14px rgba(0,0,0,{ombra_alfa});
+        background-color: {tema['bg_card']} !important;
+        border: 1px solid {accent_hex}44 !important;
+        color: {tema['text_color']} !important;
+        padding: 18px;
+        border-radius: {tema['border_radius']}px;
+        box-shadow: {box_shadow_glow};
     }}
-    [data-testid="stMetricValue"] {{ color: {tema['accent']} !important; }}
+    [data-testid="stMetricValue"] {{ color: {accent_hex} !important; }}
 
     .stButton > button, .stDownloadButton > button {{
         background-color: #1a1d29 !important; color: #ffffff !important;
         border-radius: {tema['border_radius']}px !important; border: 1px solid {tema['border_color']} !important; font-weight: 600 !important;
-        padding: 0.6rem 1.2rem !important; width: 100% !important; transition: background-color 0.2s ease, border-color 0.2s ease;
+        padding: 0.6rem 1.2rem !important; width: 100% !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, {max(0.15, ombra_alfa * 0.8)}), 0 0 8px {accent_hex}14;
+        transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
     }}
     .stButton > button:hover, .stDownloadButton > button:hover {{
         background-color: #ef4444 !important; border-color: #ef4444 !important; color: #ffffff !important;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35), 0 0 14px rgba(239, 68, 68, 0.35);
     }}
 
     [data-testid="stExpander"] {{
         background-color: {tema['bg_card']} !important;
-        border: 1px solid {tema['border_color']} !important;
+        border: 1px solid {accent_hex}44 !important;
         border-radius: {tema['border_radius']}px !important;
+        box-shadow: {box_shadow_glow};
     }}
     [data-testid="stExpander"] summary {{
         font-size: 20px !important;
@@ -235,8 +245,15 @@ st.markdown(f"""
         background-color: {tema['bg_card']} !important; color: {tema['text_color']} !important;
         border-color: {tema['border_color']} !important; border-radius: {max(4, tema['border_radius']-4)}px !important;
     }}
-    table {{ background-color: {tema['bg_card']}; border-radius: {tema['border_radius']}px; overflow: hidden; border: 1px solid {tema['border_color']}; width: 100% !important; }}
-    th {{ background-color: {tema['accent']} !important; color: #ffffff !important; text-align: center !important; }}
+    table {{
+        background-color: {tema['bg_card']};
+        border-radius: {tema['border_radius']}px;
+        overflow: hidden;
+        border: 1px solid {accent_hex}38;
+        width: 100% !important;
+        box-shadow: {box_shadow_glow};
+    }}
+    th {{ background-color: {accent_hex} !important; color: #ffffff !important; text-align: center !important; }}
     td {{ color: {tema['text_color']} !important; border-color: {tema['border_color']} !important; }}
     {fullscreen_css}
 </style>
@@ -581,7 +598,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 voto_live = calcola_voto(temp_dict, is_portiere=True)
                 
                 with c_voto:
-                    st.markdown(f"<div style='background-color: #1e2230; border: 1px solid {tema['accent']}; padding: 8px; border-radius: 8px; text-align: center; margin-top: 24px;'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {tema['accent']};'>{voto_live}</span></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='background-color: #1e2230; border: 1px solid {accent_hex}; box-shadow: 0 0 10px {accent_hex}28; padding: 8px; border-radius: 8px; text-align: center; margin-top: 24px;'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live}</span></div>", unsafe_allow_html=True)
 
                 p_dati["dati_prestazione"][nome_g] = temp_dict
             else:
@@ -617,13 +634,13 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 voto_live = calcola_voto(temp_dict, is_portiere=False)
                 
                 with c_voto:
-                    st.markdown(f"<div style='background-color: #1e2230; border: 1px solid {tema['accent']}; padding: 8px; border-radius: 8px; text-align: center; margin-top: 24px;'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {tema['accent']};'>{voto_live}</span></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='background-color: #1e2230; border: 1px solid {accent_hex}; box-shadow: 0 0 10px {accent_hex}28; padding: 8px; border-radius: 8px; text-align: center; margin-top: 24px;'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live}</span></div>", unsafe_allow_html=True)
 
                 p_dati["dati_prestazione"][nome_g] = temp_dict
 
             st.markdown("---")
 
-        st.markdown("<br><hr style='border: 2px dashed #10b981;'><br>", unsafe_allow_html=True)
+        st.markdown(f"<br><hr style='border: 2px dashed {accent_hex};'><br>", unsafe_allow_html=True)
 
         st.markdown("### 🔵 RISERVE / PANCHINA (Maglie 12 - 20)")
         for i in range(12, 21):
@@ -650,7 +667,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 voto_live_res = calcola_voto(temp_dict_res, is_portiere=True)
                 
                 with c_voto:
-                    st.markdown(f"<div style='background-color: #1e2230; border: 1px solid {tema['accent']}; padding: 8px; border-radius: 8px; text-align: center; margin-top: 24px;'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {tema['accent']};'>{voto_live_res}</span></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='background-color: #1e2230; border: 1px solid {accent_hex}; box-shadow: 0 0 10px {accent_hex}28; padding: 8px; border-radius: 8px; text-align: center; margin-top: 24px;'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live_res}</span></div>", unsafe_allow_html=True)
 
                 p_dati["dati_prestazione"][nome_g] = temp_dict_res
             else:
@@ -686,7 +703,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 voto_live_res = calcola_voto(temp_dict_res, is_portiere=False)
                 
                 with c_voto:
-                    st.markdown(f"<div style='background-color: #1e2230; border: 1px solid {tema['accent']}; padding: 8px; border-radius: 8px; text-align: center; margin-top: 24px;'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {tema['accent']};'>{voto_live_res}</span></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='background-color: #1e2230; border: 1px solid {accent_hex}; box-shadow: 0 0 10px {accent_hex}28; padding: 8px; border-radius: 8px; text-align: center; margin-top: 24px;'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live_res}</span></div>", unsafe_allow_html=True)
 
                 p_dati["dati_prestazione"][nome_g] = temp_dict_res
 
@@ -703,7 +720,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
     with col_pdf:
         if REPORTLAB_AVAILABLE:
             if st.button("📄 Genera Report PDF Partita"):
-                pdf_path = genera_pdf_partita(partita_sel, p_dati, db_giocatori, tema["accent"])
+                pdf_path = genera_pdf_partita(partita_sel, p_dati, db_giocatori, accent_hex)
                 if pdf_path and os.path.exists(pdf_path):
                     with open(pdf_path, "rb") as f:
                         st.download_button("Scarica PDF Ufficiale", f, file_name=pdf_path, mime="application/pdf")
@@ -774,14 +791,14 @@ elif menu == "🎥 Video Analisi":
             st.markdown(f"""
                 <div style="position: relative; width: 100%; height: 0; padding-bottom: 56.25%;">
                     <iframe src="{embed_url}" 
-                            style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 12px; border: 1px solid {tema['border_color']};" 
+                            style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 12px; border: 1px solid {accent_hex}55; box-shadow: {box_shadow_glow};" 
                             allowfullscreen>
                     </iframe>
                 </div>
             """, unsafe_allow_html=True)
         else:
             st.markdown(f"""
-                <div style="background-color: {tema['bg_card']}; border: 2px dashed {tema['border_color']}; border-radius: 12px; height: 320px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px;">
+                <div style="background-color: {tema['bg_card']}; border: 2px dashed {accent_hex}55; border-radius: 12px; height: 320px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; box-shadow: {box_shadow_glow};">
                     <span style="font-size: 40px; margin-bottom: 10px;">📺</span>
                     <p style="color: #a0aec0; margin: 0; font-size: 16px;">Nessun video caricato o link YouTube non valido.</p>
                     <p style="color: #718096; margin-top: 5px; font-size: 13px;">Inserisci un link valido nel pannello a sinistra e premi Play.</p>
@@ -833,7 +850,6 @@ elif menu == "📈 Riepilogo Squadra":
     presenze_titolare = 0
     presenze_subentro = 0
 
-    # Conteggi totali parametri inseriti
     tot_duelli_v = 0
     tot_duelli_t = 0
     lista_passaggi = []
@@ -869,7 +885,6 @@ elif menu == "📈 Riepilogo Squadra":
                         elif 12 <= num_maglia <= 20:
                             presenze_subentro += 1
 
-                    # Somma totale di tutti i parametri inseriti per il giocatore
                     if "parate" in d_p or "uscite" in d_p or "gol_subiti_resp" in d_p:
                         ha_dati_portiere = True
                         tot_parate += int(d_p.get("parate", 0))
@@ -904,8 +919,8 @@ elif menu == "📈 Riepilogo Squadra":
 
     # 1. Conteggio totale parametri inseriti (PRIMA di presenze e minutaggio)
     st.markdown(f"""
-    <div style="background-color: {tema['bg_card']}; border: 1px solid {tema['border_color']}; border-radius: {tema['border_radius']}px; padding: 20px; box-shadow: 0 6px 14px rgba(0,0,0,{ombra_alfa}); margin-bottom: 18px;">
-        <h4 style="margin-top: 0; color: {tema['accent']}; border-bottom: 1px solid {tema['border_color']}; padding-bottom: 10px;">🧮 Conteggio Totale Parametri Inseriti: {giocatore_sel}</h4>
+    <div style="background-color: {tema['bg_card']}; border: 1px solid {accent_hex}48; border-radius: {tema['border_radius']}px; padding: 20px; box-shadow: {box_shadow_glow}; margin-bottom: 18px;">
+        <h4 style="margin-top: 0; color: {accent_hex}; border-bottom: 1px solid {tema['border_color']}; padding-bottom: 10px;">🧮 Conteggio Totale Parametri Inseriti: {giocatore_sel}</h4>
     """, unsafe_allow_html=True)
 
     if ha_dati_movimento:
@@ -921,7 +936,7 @@ elif menu == "📈 Riepilogo Squadra":
         p1, p2, p3 = st.columns(3)
         p1.metric("Parate Totali", tot_parate)
         p2.metric("Uscite (Rius./Tent.)", f"{tot_uscite_v}/{tot_uscite_t}")
-        p3.metric("Gol Subiti / Responsabile", f"{tot_gol_sub}/{tot_gol_resp}")
+        p3.metric("Gol Subiti / Respinti", f"{tot_gol_sub}/{tot_gol_resp}")
 
     if not ha_dati_movimento and not ha_dati_portiere:
         st.info("Nessun parametro registrato per questo giocatore.")
@@ -930,8 +945,8 @@ elif menu == "📈 Riepilogo Squadra":
 
     # 2. Dettaglio Presenze & Minutaggio (DOPO il conteggio parametri)
     st.markdown(f"""
-    <div style="background-color: {tema['bg_card']}; border: 1px solid {tema['border_color']}; border-radius: {tema['border_radius']}px; padding: 20px; box-shadow: 0 6px 14px rgba(0,0,0,{ombra_alfa});">
-        <h4 style="margin-top: 0; color: {tema['accent']}; border-bottom: 1px solid {tema['border_color']}; padding-bottom: 10px;">📋 Dettaglio Presenze & Minutaggio: {giocatore_sel}</h4>
+    <div style="background-color: {tema['bg_card']}; border: 1px solid {accent_hex}48; border-radius: {tema['border_radius']}px; padding: 20px; box-shadow: {box_shadow_glow};">
+        <h4 style="margin-top: 0; color: {accent_hex}; border-bottom: 1px solid {tema['border_color']}; padding-bottom: 10px;">📋 Dettaglio Presenze & Minutaggio: {giocatore_sel}</h4>
         <div style="display: flex; justify-content: space-around; text-align: center; margin-top: 15px;">
             <div>
                 <span style="font-size: 13px; color: #a0aec0; display: block;">PRESENZE TOTALI</span>
@@ -939,7 +954,7 @@ elif menu == "📈 Riepilogo Squadra":
             </div>
             <div>
                 <span style="font-size: 13px; color: #a0aec0; display: block;">DA TITOLARE (1-11)</span>
-                <span style="font-size: 24px; font-weight: bold; color: {tema['accent']};">{presenze_titolare}</span>
+                <span style="font-size: 24px; font-weight: bold; color: {accent_hex};">{presenze_titolare}</span>
             </div>
             <div>
                 <span style="font-size: 13px; color: #a0aec0; display: block;">SUBENTRI (12-20)</span>
@@ -947,7 +962,7 @@ elif menu == "📈 Riepilogo Squadra":
             </div>
             <div>
                 <span style="font-size: 13px; color: #a0aec0; display: block;">MINUTI GIOCATI</span>
-                <span style="font-size: 24px; font-weight: bold; color: {tema['accent']};">{tot_minuti}'</span>
+                <span style="font-size: 24px; font-weight: bold; color: {accent_hex};">{tot_minuti}'</span>
             </div>
         </div>
     </div>
