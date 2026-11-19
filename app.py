@@ -59,6 +59,16 @@ SCALA_MEDIA_EFFICACIA_PASSAGGI = {
     "Pessima": -2.0,
 }
 
+TUTTE_LE_SCHEDE_APP = [
+    "📋 Setup Partite & Formazioni",
+    "⚡ Inserimento Parametri & Voti",
+    "🎥 Video Analisi",
+    "📈 Riepilogo Squadra",
+    "📊 Grafici & Analisi Visiva",
+    "👤 Gestione Rosa",
+    "🎨 Editor Grafica",
+]
+
 def normalizza_efficacia_passaggi(valore):
     """Converte valori vecchi (es. percentuali o stringhe) in una categoria valida."""
     if isinstance(valore, str) and valore.strip() in DELTA_EFFICACIA_PASSAGGI:
@@ -287,7 +297,16 @@ def inizializza_sicurezza_ruoli(dati_salvati):
                 "📈 Riepilogo Squadra",
                 "📊 Grafici & Analisi Visiva",
             ],
+            "schede_attive": [
+                s for s in (cfg_salvata.get("schede_attive") or TUTTE_LE_SCHEDE_APP)
+                if s in TUTTE_LE_SCHEDE_APP
+            ] or TUTTE_LE_SCHEDE_APP.copy(),
+            "applica_nascoste_ad_admin": bool(cfg_salvata.get("applica_nascoste_ad_admin", False)),
         }
+    else:
+        cfg = st.session_state["auth_config"]
+        cfg.setdefault("schede_attive", TUTTE_LE_SCHEDE_APP.copy())
+        cfg.setdefault("applica_nascoste_ad_admin", False)
     if "is_admin" not in st.session_state:
         st.session_state["is_admin"] = False
 
@@ -296,6 +315,40 @@ def is_sola_lettura():
     return (not st.session_state.get("is_admin", False)) and bool(
         st.session_state.get("auth_config", {}).get("read_only_boys", True)
     )
+
+def render_controllo_schede_ui(key_prefix="admin"):
+    """Controllo condiviso per attivare/nascondere le schede da Pannello Admin o Editor Grafica."""
+    cfg = st.session_state["auth_config"]
+    schede_correnti = [
+        s for s in cfg.get("schede_attive", TUTTE_LE_SCHEDE_APP)
+        if s in TUTTE_LE_SCHEDE_APP
+    ] or TUTTE_LE_SCHEDE_APP.copy()
+
+    st.markdown("#### 🗂️ Attiva o Nascondi Schede")
+    st.caption("Seleziona le schede da mantenere attive nel menu laterale. Le deselezionate vengono nascoste.")
+
+    nuove_attive = []
+    cols_s = st.columns(2)
+    for idx, nome_scheda in enumerate(TUTTE_LE_SCHEDE_APP):
+        with cols_s[idx % 2]:
+            attiva = st.checkbox(
+                nome_scheda,
+                value=(nome_scheda in schede_correnti),
+                key=f"chk_scheda_{key_prefix}_{idx}"
+            )
+            if attiva:
+                nuove_attive.append(nome_scheda)
+
+    applica_admin = st.toggle(
+        "Nascondi schede deselezionate anche quando sono in modalità Admin",
+        value=bool(cfg.get("applica_nascoste_ad_admin", False)),
+        key=f"tgl_nascoste_admin_{key_prefix}"
+    )
+
+    if not nuove_attive:
+        st.warning("⚠️ Devi lasciare attiva almeno una scheda: se le deselezioni tutte verrà mantenuta '📈 Riepilogo Squadra'.")
+
+    return nuove_attive if nuove_attive else ["📈 Riepilogo Squadra"], bool(applica_admin)
 
 def estrai_youtube_id(url):
     if not url:
@@ -950,23 +1003,26 @@ with st.sidebar:
 
     st.divider()
 
-    tutte_le_sezioni = [
-        "📋 Setup Partite & Formazioni",
-        "⚡ Inserimento Parametri & Voti",
-        "🎥 Video Analisi",
-        "📈 Riepilogo Squadra",
-        "📊 Grafici & Analisi Visiva",
-        "👤 Gestione Rosa",
-        "🎨 Editor Grafica",
-    ]
-    if st.session_state["is_admin"]:
-        tutte_le_sezioni.append("🛡️ Pannello Admin")
+    schede_attive_cfg = [
+        s for s in auth_cfg.get("schede_attive", TUTTE_LE_SCHEDE_APP)
+        if s in TUTTE_LE_SCHEDE_APP
+    ] or ["📈 Riepilogo Squadra"]
+    applica_nascoste_ad_admin = bool(auth_cfg.get("applica_nascoste_ad_admin", False))
 
     if st.session_state["is_admin"]:
-        sezioni_disponibili = tutte_le_sezioni
+        base_admin = schede_attive_cfg if applica_nascoste_ad_admin else TUTTE_LE_SCHEDE_APP
+        sezioni_disponibili = list(base_admin) + ["🛡️ Pannello Admin"]
     else:
-        ammesse = [s for s in auth_cfg.get("sezioni_ragazzi", []) if s in tutte_le_sezioni]
-        sezioni_disponibili = ammesse if ammesse else ["🎥 Video Analisi", "📈 Riepilogo Squadra", "📊 Grafici & Analisi Visiva"]
+        ammesse_ragazzi = [
+            s for s in auth_cfg.get("sezioni_ragazzi", [])
+            if s in TUTTE_LE_SCHEDE_APP and s in schede_attive_cfg
+        ]
+        if not ammesse_ragazzi:
+            ammesse_ragazzi = [
+                s for s in schede_attive_cfg
+                if s in ["🎥 Video Analisi", "📈 Riepilogo Squadra", "📊 Grafici & Analisi Visiva"]
+            ] or [schede_attive_cfg[0]]
+        sezioni_disponibili = ammesse_ragazzi
 
     menu = st.radio("Navigazione", sezioni_disponibili)
 
@@ -1703,7 +1759,6 @@ elif menu == "📊 Grafici & Analisi Visiva":
         key=lambda item: parse_data_partita(item[1].get("data", "01/01/2026"))
     )
 
-    # --- Sezione 1: Voto Medio Squadra per Partita ---
     st.subheader("🏆 Voto Medio Squadra per Partita")
     filtro_luogo = st.radio(
         "Filtra partite",
@@ -1756,7 +1811,6 @@ elif menu == "📊 Grafici & Analisi Visiva":
 
     st.divider()
 
-    # --- Sezione 2: Andamento Voti & Parametri del Giocatore ---
     st.subheader("📈 Andamento Voti & Parametri Giocatore")
     nomi_rosa = list(db_giocatori.keys()) if db_giocatori else []
     if not nomi_rosa:
@@ -1850,7 +1904,6 @@ elif menu == "📊 Grafici & Analisi Visiva":
 
     st.divider()
 
-    # --- Sezione 3: Confronto Rosa (Minuti Giocati e Gol) ---
     st.subheader("👥 Confronto Rosa: Minuti Giocati & Gol Segnati")
     righe_rosa_graf = []
     for nome_r in nomi_rosa:
@@ -2107,6 +2160,9 @@ elif menu == "🎨 Editor Grafica":
             key="slider_glow_width"
         )
 
+    st.divider()
+    nuove_schede_graf, nascondi_admin_graf = render_controllo_schede_ui(key_prefix="grafica")
+
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("💾 Salva Impostazioni Grafiche", use_container_width=True, key="btn_salva_grafica"):
         st.session_state["ui_theme"]["font_size"] = int(nuovo_font_size)
@@ -2114,10 +2170,13 @@ elif menu == "🎨 Editor Grafica":
         st.session_state["ui_theme"]["glow_intensity"] = int(nuova_glow_intensita)
         st.session_state["ui_theme"]["glow_width"] = int(nuova_glow_larghezza)
         st.session_state["fullscreen_mode"] = bool(attiva_fs)
+        st.session_state["auth_config"]["schede_attive"] = nuove_schede_graf
+        st.session_state["auth_config"]["applica_nascoste_ad_admin"] = nascondi_admin_graf
         salva_dati_su_disco()
         st.session_state["ui_notice"] = (
             f"Modifiche salvate e applicate! Font: {nuovo_font_size}px · "
-            f"Glow: {nuova_glow_intensita}% / {nuova_glow_larghezza}px."
+            f"Glow: {nuova_glow_intensita}% / {nuova_glow_larghezza}px · "
+            f"Schede attive: {len(nuove_schede_graf)}."
         )
         st.rerun()
 
@@ -2129,7 +2188,7 @@ elif menu == "🛡️ Pannello Admin":
         st.warning("Accesso riservato all'Admin. Effettua il login dalla sidebar.")
         st.stop()
 
-    st.title("🛡️ Pannello Admin — Controllo Accessi Ragazzi")
+    st.title("🛡️ Pannello Admin — Controllo Accessi & Schede")
 
     with st.form("form_admin_accessi"):
         st.subheader("1. Regole Accesso Ragazzi")
@@ -2138,14 +2197,7 @@ elif menu == "🛡️ Pannello Admin":
             value=bool(auth_cfg.get("read_only_boys", True)),
         )
 
-        opzioni_sez_ragazzi = [
-            "📋 Setup Partite & Formazioni",
-            "⚡ Inserimento Parametri & Voti",
-            "🎥 Video Analisi",
-            "📈 Riepilogo Squadra",
-            "📊 Grafici & Analisi Visiva",
-            "👤 Gestione Rosa",
-        ]
+        opzioni_sez_ragazzi = [s for s in TUTTE_LE_SCHEDE_APP if s != "🎨 Editor Grafica"]
         sezioni_scelte = st.multiselect(
             "Sezioni visibili ai ragazzi",
             options=opzioni_sez_ragazzi,
@@ -2157,7 +2209,7 @@ elif menu == "🛡️ Pannello Admin":
         nuovo_pin = st.text_input("Nuovo PIN (lascia vuoto per mantenere l'attuale)", type="password")
         conferma_pin = st.text_input("Conferma Nuovo PIN", type="password")
 
-        if st.form_submit_button("💾 Salva Impostazioni Accessi", use_container_width=True):
+        if st.form_submit_button("💾 Salva Accessi & PIN", use_container_width=True):
             if nuovo_pin or conferma_pin:
                 if nuovo_pin != conferma_pin:
                     st.error("I due PIN non coincidono.")
@@ -2173,3 +2225,13 @@ elif menu == "🛡️ Pannello Admin":
             salva_dati_su_disco()
             st.success("Impostazioni di accesso salvate su disco!")
             st.rerun()
+
+    st.divider()
+    nuove_schede_adm, nascondi_admin_adm = render_controllo_schede_ui(key_prefix="admin_tab")
+    if st.button("💾 Salva Visibilità Schede", use_container_width=True, key="btn_salva_schede_admin"):
+        auth_cfg["schede_attive"] = nuove_schede_adm
+        auth_cfg["applica_nascoste_ad_admin"] = nascondi_admin_adm
+        st.session_state["auth_config"] = auth_cfg
+        salva_dati_su_disco()
+        st.success("Visibilità delle schede salvata su disco!")
+        st.rerun()
