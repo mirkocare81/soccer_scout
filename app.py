@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import altair as alt
 import io
@@ -36,7 +37,7 @@ st.set_page_config(
 )
 
 # =====================================================================
-# COSTANTI RUOLI IN CAMPO & EFFICACIA PASSAGGI
+# COSTANTI RUOLI IN CAMPO, EFFICACIA PASSAGGI & UTENTI HOME
 # =====================================================================
 RUOLI_DIFENSORI = ["TS", "DC", "TD"]
 RUOLI_CENTROCAMPISTI = ["CDC", "CC", "TQ"]
@@ -68,6 +69,53 @@ TUTTE_LE_SCHEDE_APP = [
     "👤 Gestione Rosa",
     "🎨 Editor Grafica",
 ]
+
+UTENTI_EXTRA_HOME = ["Mr Fabio", "Mirko", "Mr. Alessandro"]
+
+def ottieni_opzioni_accesso_home(db_giocatori):
+    """Restituisce la lista utenti per la Home includendo Mr Fabio, Mirko, Mr. Alessandro e tutta la rosa."""
+    nomi_rosa = list((db_giocatori or {}).keys())
+    opzioni = []
+    for u in UTENTI_EXTRA_HOME + nomi_rosa:
+        u_clean = str(u).strip()
+        if u_clean and u_clean not in opzioni:
+            opzioni.append(u_clean)
+    return opzioni if opzioni else UTENTI_EXTRA_HOME.copy()
+
+def sincronizza_client_localstorage(utente_da_salvare=None):
+    """Salva su localStorage del client l'utente scelto oppure lo legge e aggiorna ?utente= al primo caricamento."""
+    if utente_da_salvare:
+        utente_json = json.dumps(utente_da_salvare)
+        components.html(
+            f"""
+            <script>
+            try {{
+                window.localStorage.setItem("scoutai_uso_nuvolento_utente", {utente_json});
+            }} catch (e) {{}}
+            </script>
+            """,
+            height=0,
+            width=0,
+        )
+    else:
+        components.html(
+            """
+            <script>
+            try {
+                const saved = window.localStorage.getItem("scoutai_uso_nuvolento_utente");
+                if (saved) {
+                    const url = new URL(window.parent.location.href);
+                    if (!url.searchParams.get("utente")) {
+                        url.searchParams.set("utente", saved);
+                        window.parent.location.replace(url.toString());
+                    }
+                }
+            } catch (e) {}
+            </script>
+            """,
+            height=0,
+            width=0,
+        )
 
 def normalizza_efficacia_passaggi(valore):
     """Converte valori vecchi (es. percentuali o stringhe) in una categoria valida."""
@@ -269,6 +317,8 @@ def salva_dati_su_disco():
             "ui_theme": st.session_state.get("ui_theme", {}),
             "fullscreen_mode": st.session_state.get("fullscreen_mode", False),
             "auth_config": st.session_state.get("auth_config", {}),
+            "statistiche_accessi": st.session_state.get("statistiche_accessi", {}),
+            "ultimo_utente_home": st.session_state.get("ultimo_utente_home", ""),
         }
         with open(DB_FILE, "w", encoding="utf-8") as f:
             json.dump(data_to_save, f, ensure_ascii=False, indent=4)
@@ -403,6 +453,19 @@ inizializza_sicurezza_ruoli(dati_salvati)
 
 if "home_entered" not in st.session_state:
     st.session_state["home_entered"] = False
+
+if "statistiche_accessi" not in st.session_state:
+    st.session_state["statistiche_accessi"] = (
+        dati_salvati.get("statistiche_accessi", {}) if isinstance(dati_salvati, dict) else {}
+    )
+
+if "ultimo_utente_home" not in st.session_state:
+    st.session_state["ultimo_utente_home"] = (
+        dati_salvati.get("ultimo_utente_home", "") if isinstance(dati_salvati, dict) else ""
+    )
+
+if "utente_attivo" not in st.session_state:
+    st.session_state["utente_attivo"] = ""
 
 if "ui_theme" not in st.session_state:
     base_theme = PRESET_TEMI["Emerald Dark (Default)"].copy()
@@ -637,6 +700,9 @@ def mostra_notifica_tema(messaggio, icona="✅"):
 # SCHERMATA HOME DI ACCESSO
 # =====================================================================
 if not st.session_state["home_entered"]:
+    # Se il client ha già salvato il proprio utente in localStorage, lo recupera in ?utente=
+    sincronizza_client_localstorage(utente_da_salvare=None)
+
     st.markdown(f"""
     <style>
         [data-testid="stSidebar"] {{ display: none !important; }}
@@ -679,11 +745,53 @@ if not st.session_state["home_entered"]:
             unsafe_allow_html=True,
         )
 
-        if st.button("Inizia l'analisi", use_container_width=True, key="btn_inizia_analisi"):
+        opzioni_home = ottieni_opzioni_accesso_home(st.session_state.get("database_giocatori", {}))
+        qp_utente = st.query_params.get("utente", "")
+        if qp_utente in opzioni_home:
+            default_utente = qp_utente
+        elif st.session_state.get("utente_attivo") in opzioni_home:
+            default_utente = st.session_state["utente_attivo"]
+        elif st.session_state.get("ultimo_utente_home") in opzioni_home:
+            default_utente = st.session_state["ultimo_utente_home"]
+        else:
+            default_utente = opzioni_home[0]
+
+        col_sel_u, col_btn_u = st.columns([1.4, 1.0])
+        with col_sel_u:
+            utente_scelto = st.selectbox(
+                "Chi sta accedendo",
+                options=opzioni_home,
+                index=opzioni_home.index(default_utente),
+                key="sel_utente_home",
+                label_visibility="collapsed"
+            )
+        with col_btn_u:
+            clic_inizia = st.button("Inizia l'analisi", use_container_width=True, key="btn_inizia_analisi")
+
+        stat_u = st.session_state.get("statistiche_accessi", {}).get(
+            utente_scelto, {"count": 0, "ultimo_accesso": "Mai"}
+        )
+        st.caption(
+            f"👤 Utente selezionato: **{utente_scelto}** · Accessi totali: **{stat_u.get('count', 0)}** "
+            f"(Ultimo: {stat_u.get('ultimo_accesso', 'Mai')})"
+        )
+
+        if clic_inizia:
+            stats = st.session_state.setdefault("statistiche_accessi", {})
+            rec = stats.get(utente_scelto, {"count": 0, "ultimo_accesso": ""})
+            rec["count"] = int(rec.get("count", 0)) + 1
+            rec["ultimo_accesso"] = datetime.now().strftime("%d/%m/%Y %H:%M")
+            stats[utente_scelto] = rec
+
+            st.session_state["ultimo_utente_home"] = utente_scelto
+            st.session_state["utente_attivo"] = utente_scelto
+            st.session_state["salva_utente_su_client"] = utente_scelto
             st.session_state["home_entered"] = True
+            st.query_params["utente"] = utente_scelto
+            salva_dati_su_disco()
             st.rerun()
 
-        st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
 
         if HOME_IMAGE_PATH and os.path.exists(HOME_IMAGE_PATH):
             st.image(HOME_IMAGE_PATH, use_container_width=True)
@@ -691,6 +799,13 @@ if not st.session_state["home_entered"]:
             st.info("Salva l'immagine come `eagle.jpg` nella cartella dell'app per mostrarla nella schermata Home.")
 
     st.stop()
+
+# =====================================================================
+# PERSISTENZA CLIENT (SALVA UTENTE IN LOCALSTORAGE DOPO IL PRIMO ACCESSO)
+# =====================================================================
+if st.session_state.get("salva_utente_su_client"):
+    sincronizza_client_localstorage(utente_da_salvare=st.session_state["salva_utente_su_client"])
+    st.session_state["salva_utente_su_client"] = None
 
 # =====================================================================
 # HEADER CON LOGO IN ALTO A SINISTRA
@@ -976,6 +1091,11 @@ def selettore_partita_persistente(label, widget_key):
     )
 
 with st.sidebar:
+    utente_corrente_sb = st.session_state.get("utente_attivo") or st.session_state.get("ultimo_utente_home")
+    if utente_corrente_sb:
+        tot_u_sb = st.session_state.get("statistiche_accessi", {}).get(utente_corrente_sb, {}).get("count", 0)
+        st.caption(f"👤 Connesso come: **{utente_corrente_sb}** ({tot_u_sb} accessi)")
+
     if st.button("🏠 Schermata Home", use_container_width=True, key="btn_torna_home"):
         st.session_state["home_entered"] = False
         st.rerun()
@@ -1426,7 +1546,6 @@ elif menu == "🎥 Video Analisi":
     if "youtube_link" not in p_info:
         p_info["youtube_link"] = ""
 
-    # 1. Riepilogo dati partita compatto (ottimizzato desktop + mobile)
     data_p = p_info.get("data", "N.D.")
     ris_p = p_info.get("risultato", "N.D.")
     luogo_p = p_info.get("casa_trasferta", "Casa")
@@ -1458,7 +1577,6 @@ elif menu == "🎥 Video Analisi":
     </div>
     """, unsafe_allow_html=True)
 
-    # 2. Link YouTube e pulsante "Carica Video" (solo se non in sola lettura)
     if not lettura_only:
         col_link, col_btn = st.columns([3.5, 1.2])
         with col_link:
@@ -1479,7 +1597,6 @@ elif menu == "🎥 Video Analisi":
 
         st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
-    # 3. Main Frame video centrato a tutta larghezza dello schermo
     link_corrente = p_info.get("youtube_link", "")
     yt_id = estrai_youtube_id(link_corrente)
 
@@ -1685,7 +1802,6 @@ elif menu == "📈 Riepilogo Squadra":
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # 1. Conteggio totale parametri inseriti (PRIMA di presenze e minutaggio)
     st.markdown(f"""
     <div class="scoutai-box" style="margin-bottom: 18px;">
         <h4 style="margin-top: 0; color: {accent_hex}; border-bottom: 1px solid {tema['border_color']}; padding-bottom: 10px;">🧮 Conteggio Totale Parametri Inseriti: {giocatore_sel}</h4>
@@ -1712,7 +1828,6 @@ elif menu == "📈 Riepilogo Squadra":
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # 2. Dettaglio Presenze & Minutaggio (DOPO il conteggio parametri)
     st.markdown(f"""
     <div class="scoutai-box" style="margin-bottom: 18px;">
         <h4 style="margin-top: 0; color: {accent_hex}; border-bottom: 1px solid {tema['border_color']}; padding-bottom: 10px;">📋 Dettaglio Presenze & Minutaggio: {giocatore_sel}</h4>
@@ -1737,7 +1852,6 @@ elif menu == "📈 Riepilogo Squadra":
     </div>
     """, unsafe_allow_html=True)
 
-    # 3. Tabella partita per partita del giocatore selezionato
     st.markdown(f"#### 🗓️ Dettaglio Partita per Partita: {giocatore_sel}")
     if righe_match_giocatore:
         st.table(pd.DataFrame(righe_match_giocatore))
@@ -2234,4 +2348,27 @@ elif menu == "🛡️ Pannello Admin":
         st.session_state["auth_config"] = auth_cfg
         salva_dati_su_disco()
         st.success("Visibilità delle schede salvata su disco!")
+        st.rerun()
+
+    st.divider()
+    st.subheader("📊 Registro Accessi dalla Home")
+    opzioni_reg = ottieni_opzioni_accesso_home(db_giocatori)
+    stats_reg = st.session_state.get("statistiche_accessi", {})
+    righe_accessi = []
+    for u_nome in opzioni_reg:
+        info_u = stats_reg.get(u_nome, {})
+        righe_accessi.append({
+            "Utente / Giocatore": u_nome,
+            "Accessi": int(info_u.get("count", 0)),
+            "Ultimo Accesso": info_u.get("ultimo_accesso") or "Mai",
+        })
+    df_accessi = pd.DataFrame(righe_accessi).sort_values(
+        by=["Accessi", "Utente / Giocatore"], ascending=[False, True]
+    )
+    st.table(df_accessi)
+
+    if st.button("🗑️ Azzera Contatori Accessi", key="btn_reset_accessi"):
+        st.session_state["statistiche_accessi"] = {}
+        salva_dati_su_disco()
+        st.success("Contatori accessi azzerati!")
         st.rerun()
