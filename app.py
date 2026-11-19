@@ -17,6 +17,12 @@ try:
 except ImportError:
     REPORTLAB_AVAILABLE = False
 
+try:
+    from PIL import Image as PILImage
+    PIL_AVAILABLE = True
+except ImportError:
+    PIL_AVAILABLE = False
+
 # =====================================================================
 # CONFIGURAZIONE PAGINA STREAMLIT
 # =====================================================================
@@ -652,6 +658,21 @@ def calcola_trend_giocatore(storico_voti):
 # =====================================================================
 # GENERATORE PDF (OPZIONALE SE REPORTLAB È DISPONIBILE)
 # =====================================================================
+def _crea_immagine_pdf_adattata(img_path, max_w=34, max_h=34):
+    """Crea un RLImage proporzionato entro max_w x max_h senza distorcere la foto."""
+    if not img_path or not os.path.exists(img_path):
+        return None
+    try:
+        if PIL_AVAILABLE:
+            with PILImage.open(img_path) as im:
+                w, h = im.size
+                if w > 0 and h > 0:
+                    scala = min(max_w / float(w), max_h / float(h))
+                    return RLImage(img_path, width=max(12.0, w * scala), height=max(12.0, h * scala))
+        return RLImage(img_path, width=max_w, height=max_h)
+    except Exception:
+        return None
+
 def genera_pdf_partita(match_name, match_data, db_giocatori, accent_hex):
     if not REPORTLAB_AVAILABLE:
         return None
@@ -660,40 +681,92 @@ def genera_pdf_partita(match_name, match_data, db_giocatori, accent_hex):
     elements = []
     styles = getSampleStyleSheet()
 
-    title_style = ParagraphStyle('TitleStyle', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=15, textColor=colors.HexColor(accent_hex), alignment=1, spaceAfter=8)
-    sub_style = ParagraphStyle('SubStyle', parent=styles['Normal'], fontName='Helvetica', fontSize=10, textColor=colors.HexColor("#cccccc"), alignment=1, spaceAfter=15)
+    title_style = ParagraphStyle(
+        'TitleStyle', parent=styles['Heading1'], fontName='Helvetica-Bold',
+        fontSize=15, textColor=colors.HexColor(accent_hex), alignment=1, spaceAfter=8
+    )
+    sub_style = ParagraphStyle(
+        'SubStyle', parent=styles['Normal'], fontName='Helvetica',
+        fontSize=10, textColor=colors.HexColor("#cccccc"), alignment=1, spaceAfter=15
+    )
+    cell_style = ParagraphStyle(
+        'CellStyle', parent=styles['Normal'], fontName='Helvetica',
+        fontSize=8.5, textColor=colors.whitesmoke, alignment=1, leading=10
+    )
 
     if LOGO_PATH and os.path.exists(LOGO_PATH):
-        elements.append(RLImage(LOGO_PATH, width=50, height=50))
+        logo_pdf = _crea_immagine_pdf_adattata(LOGO_PATH, max_w=50, max_h=50)
+        if logo_pdf:
+            elements.append(logo_pdf)
+
     elements.append(Paragraph(f"<b>USO Nuvolento - Report Partita: {match_name}</b>", title_style))
-    elements.append(Paragraph(f"<b>Avversario:</b> {match_data.get('avversario', '')} | <b>Risultato:</b> {match_data.get('risultato', 'N.D.')} | <b>{match_data.get('casa_trasferta', 'Casa')}</b>", sub_style))
-    elements.append(Paragraph(f"<b>Modulo:</b> {match_data['modulo']} | <b>Data:</b> {match_data['data']}", sub_style))
+    elements.append(Paragraph(
+        f"<b>Avversario:</b> {match_data.get('avversario', '')} | "
+        f"<b>Risultato:</b> {match_data.get('risultato', 'N.D.')} | "
+        f"<b>{match_data.get('casa_trasferta', 'Casa')}</b>",
+        sub_style
+    ))
+    elements.append(Paragraph(
+        f"<b>Modulo:</b> {match_data['modulo']} | <b>Data:</b> {match_data['data']}",
+        sub_style
+    ))
     elements.append(Spacer(1, 10))
 
-    t_data = [["N°", "Giocatore", "Ruolo", "Min.", "Statistiche Chiave", "Voto"]]
+    t_data = [["N°", "Foto", "Giocatore", "Ruolo", "Min.", "Statistiche Chiave", "Voto"]]
     for num, nome in match_data["formazione"].items():
-        if not nome: continue
+        if not nome:
+            continue
         p_dati = match_data.get("dati_prestazione", {}).get(nome, {})
         is_portiere = (str(num) in ["1", "12"])
         voto = calcola_voto(p_dati, is_portiere) if p_dati else "N.D."
-        ruolo = p_dati.get("ruolo_campo") or db_giocatori.get(nome, {}).get("ruolo", "Portiere" if is_portiere else "Movimento")
-        
+        ruolo = p_dati.get("ruolo_campo") or db_giocatori.get(nome, {}).get(
+            "ruolo", "Portiere" if is_portiere else "Movimento"
+        )
+
+        foto_path = ottieni_foto_valida(nome, db_giocatori)
+        foto_cell = _crea_immagine_pdf_adattata(foto_path, max_w=28, max_h=28) if foto_path else Paragraph("-", cell_style)
+
         if is_portiere:
-            stats = f"Parate: {p_dati.get('parate', 0)} | Uscite: {p_dati.get('uscite', '0/0')} | Gol Sub./Resp.: {p_dati.get('gol_subiti_resp', '0/0')}"
+            stats = (
+                f"Parate: {p_dati.get('parate', 0)} | "
+                f"Uscite: {p_dati.get('uscite', '0/0')} | "
+                f"Gol Sub./Resp.: {p_dati.get('gol_subiti_resp', '0/0')}"
+            )
         else:
-            eff_pass = normalizza_efficacia_passaggi(p_dati.get('efficacia_passaggi', p_dati.get('passaggi', 'Buona')))
-            stats = f"Duelli: {p_dati.get('duelli', '0/0')} | Efficacia Pass.: {eff_pass} | Perse: {p_dati.get('perse', 0)} | Tiri: {p_dati.get('tiri', '0/0')} | Gol: {p_dati.get('gol_fatti', 0)}"
+            eff_pass = normalizza_efficacia_passaggi(
+                p_dati.get('efficacia_passaggi', p_dati.get('passaggi', 'Buona'))
+            )
+            stats = (
+                f"Duelli: {p_dati.get('duelli', '0/0')} | "
+                f"Efficacia Pass.: {eff_pass} | "
+                f"Perse: {p_dati.get('perse', 0)} | "
+                f"Tiri: {p_dati.get('tiri', '0/0')} | "
+                f"Gol: {p_dati.get('gol_fatti', 0)}"
+            )
 
-        t_data.append([str(num), nome, ruolo, f"{p_dati.get('minuti', 80)}'", stats, str(voto)])
+        t_data.append([
+            str(num),
+            foto_cell,
+            Paragraph(nome, cell_style),
+            Paragraph(ruolo, cell_style),
+            f"{p_dati.get('minuti', 80)}'",
+            Paragraph(stats, cell_style),
+            str(voto)
+        ])
 
-    t = Table(t_data, colWidths=[30, 100, 90, 45, 230, 45])
+    t = Table(t_data, colWidths=[28, 36, 85, 82, 40, 214, 40], repeatRows=1)
     t.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor(accent_hex)),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#333333")),
-        ('BACKGROUND', (0,1), (-1,-1), colors.HexColor("#141721")),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(accent_hex)),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 1), (-1, -1), 8.5),
+        ('TEXTCOLOR', (0, 1), (-1, -1), colors.whitesmoke),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#333333")),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor("#141721")),
+        ('TOPPADDING', (0, 1), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 4),
     ]))
     elements.append(t)
     doc.build(elements)
