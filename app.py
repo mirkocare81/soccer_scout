@@ -28,12 +28,40 @@ st.set_page_config(
 )
 
 # =====================================================================
-# COSTANTI RUOLI IN CAMPO
+# COSTANTI RUOLI IN CAMPO & EFFICACIA PASSAGGI
 # =====================================================================
 RUOLI_DIFENSORI = ["TS", "DC", "TD"]
 RUOLI_CENTROCAMPISTI = ["CDC", "CC", "TQ"]
 RUOLI_ATTACCANTI = ["AS", "AT", "AD"]
 TUTTI_RUOLI_MOVIMENTO = RUOLI_DIFENSORI + RUOLI_CENTROCAMPISTI + RUOLI_ATTACCANTI
+
+OPZIONI_EFFICACIA_PASSAGGI = ["Ottima", "Buona", "Sufficiente", "Insufficiente", "Pessima"]
+DELTA_EFFICACIA_PASSAGGI = {
+    "Ottima": 0.7,
+    "Buona": 0.4,
+    "Sufficiente": 0.1,
+    "Insufficiente": -0.3,
+    "Pessima": -0.5,
+}
+
+def normalizza_efficacia_passaggi(valore):
+    """Converte valori vecchi (es. percentuali o stringhe) in una categoria valida."""
+    if isinstance(valore, str) and valore.strip() in DELTA_EFFICACIA_PASSAGGI:
+        return valore.strip()
+    try:
+        pct = float(valore)
+        if pct >= 85:
+            return "Ottima"
+        elif pct >= 75:
+            return "Buona"
+        elif pct >= 60:
+            return "Sufficiente"
+        elif pct >= 40:
+            return "Insufficiente"
+        else:
+            return "Pessima"
+    except Exception:
+        return "Buona"
 
 def get_macro_ruolo(ruolo_specifico):
     if ruolo_specifico in RUOLI_DIFENSORI:
@@ -411,7 +439,9 @@ def calcola_voto(p, is_portiere=False):
             macro_ruolo = get_macro_ruolo(ruolo_campo)
 
             duelli_v, duelli_t = map(int, p.get('duelli', '0/0').split("/"))
-            pct_passaggi = float(p.get('passaggi', 75)) / 100.0
+            val_raw_pass = p.get('efficacia_passaggi', p.get('passaggi', 'Buona'))
+            efficacia_pass = normalizza_efficacia_passaggi(val_raw_pass)
+            delta_pass = DELTA_EFFICACIA_PASSAGGI.get(efficacia_pass, 0.0)
             perse = int(p.get('perse', 0))
             tiri_porta, tiri_specchio = map(int, p.get('tiri', '0/0').split("/"))
             gol_fatti = int(p.get('gol_fatti', 0))
@@ -444,10 +474,10 @@ def calcola_voto(p, is_portiere=False):
             elif pct_duelli < 0.40 and duelli_t > 0:
                 rating -= (0.4 * peso_duelli) * fattore_tempo
 
-            if pct_passaggi >= 0.85:
-                rating += 0.3 * peso_passaggi
-            elif pct_passaggi < 0.50:
-                rating -= (0.3 * peso_passaggi) * fattore_tempo
+            if delta_pass >= 0:
+                rating += (delta_pass * peso_passaggi) * min(1.0, fattore_tempo + 0.2)
+            else:
+                rating += (delta_pass * peso_passaggi) * fattore_tempo
 
             if perse > 0:
                 rating -= (perse * 0.6 * peso_perse) * fattore_tempo
@@ -506,7 +536,8 @@ def genera_pdf_partita(match_name, match_data, db_giocatori, accent_hex):
         if is_portiere:
             stats = f"Parate: {p_dati.get('parate', 0)} | Uscite: {p_dati.get('uscite', '0/0')} | Gol Sub./Resp.: {p_dati.get('gol_subiti_resp', '0/0')}"
         else:
-            stats = f"Duelli: {p_dati.get('duelli', '0/0')} | Pass: {p_dati.get('passaggi', 75)}% | Perse: {p_dati.get('perse', 0)} | Tiri: {p_dati.get('tiri', '0/0')} | Gol: {p_dati.get('gol_fatti', 0)}"
+            eff_pass = normalizza_efficacia_passaggi(p_dati.get('efficacia_passaggi', p_dati.get('passaggi', 'Buona')))
+            stats = f"Duelli: {p_dati.get('duelli', '0/0')} | Efficacia Pass.: {eff_pass} | Perse: {p_dati.get('perse', 0)} | Tiri: {p_dati.get('tiri', '0/0')} | Gol: {p_dati.get('gol_fatti', 0)}"
 
         t_data.append([str(num), nome, ruolo, f"{p_dati.get('minuti', 80)}'", stats, str(voto)])
 
@@ -677,11 +708,9 @@ elif menu == "⚡ Inserimento Parametri & Voti":
         p_dati["dati_prestazione"] = {}
 
     st.subheader(f"Analisi Match: {partita_sel} (Risultato: {p_dati.get('risultato', 'N.D.')} | {p_dati.get('casa_trasferta', 'Casa')})")
-    st.caption("Pesi voto: Difensori (TS, DC, TD) → focus Duelli | Centrocampisti (CDC, CC, TQ) → focus Passaggi & Perse | Attaccanti (AS, AT, AD) → focus Tiri | Gol = +1 per tutti.")
+    st.caption("Efficacia passaggi: Ottima (+0,7) · Buona (+0,4) · Sufficiente (+0,1) · Insufficiente (-0,3) · Pessima (-0,5), pesata sul ruolo. Gol = +1 per tutti.")
 
     with st.form("form_inserimento_parametri"):
-        passaggi_opt = [100, 75, 50, 25, 10]
-        
         st.markdown("### 🔴 TITOLARI (Maglie 1 - 11)")
         for i in range(1, 12):
             nome_g = p_dati["formazione"].get(str(i), p_dati["formazione"].get(i, ""))
@@ -719,15 +748,15 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                     idx_ruolo = TUTTI_RUOLI_MOVIMENTO.index(val_ruolo) if val_ruolo in TUTTI_RUOLI_MOVIMENTO else TUTTI_RUOLI_MOVIMENTO.index("CC")
                     ruolo_campo = st.selectbox("Ruolo", TUTTI_RUOLI_MOVIMENTO, index=idx_ruolo, key=f"ruolo_{partita_sel}_{i}", label_visibility="collapsed")
 
-                c1, c2, c3, c4, c5, c6, c_voto = st.columns([1, 1, 1, 0.8, 1, 0.8, 1])
+                c1, c2, c3, c4, c5, c6, c_voto = st.columns([1, 1, 1.3, 0.8, 1, 0.8, 1])
                 with c1:
                     minuti = st.number_input("Minuti", 1, 80, int(current_vals.get("minuti", 80)), key=f"min_{partita_sel}_{i}")
                 with c2:
                     duelli = st.text_input("Duelli V/T", str(current_vals.get("duelli", "5/5")), key=f"due_{partita_sel}_{i}")
                 with c3:
-                    val_pass = int(current_vals.get("passaggi", 75))
-                    idx_pass = passaggi_opt.index(val_pass) if val_pass in passaggi_opt else 1
-                    passaggi = st.selectbox("Pass %", passaggi_opt, index=idx_pass, key=f"pas_{partita_sel}_{i}")
+                    val_eff = normalizza_efficacia_passaggi(current_vals.get("efficacia_passaggi", current_vals.get("passaggi", "Buona")))
+                    idx_eff = OPZIONI_EFFICACIA_PASSAGGI.index(val_eff) if val_eff in OPZIONI_EFFICACIA_PASSAGGI else 1
+                    efficacia_passaggi = st.selectbox("Efficacia passaggi", OPZIONI_EFFICACIA_PASSAGGI, index=idx_eff, key=f"pas_{partita_sel}_{i}")
                 with c4:
                     perse = st.number_input("Perse", 0, 10, int(current_vals.get("perse", 0)), key=f"per_{partita_sel}_{i}")
                 with c5:
@@ -737,7 +766,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 
                 temp_dict = {
                     "ruolo_campo": ruolo_campo,
-                    "minuti": minuti, "duelli": duelli, "passaggi": passaggi,
+                    "minuti": minuti, "duelli": duelli, "efficacia_passaggi": efficacia_passaggi,
                     "perse": perse, "tiri": tiri, "gol_fatti": gol_fatti, "salvataggi": 0
                 }
                 voto_live = calcola_voto(temp_dict, is_portiere=False)
@@ -788,15 +817,15 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                     idx_ruolo = TUTTI_RUOLI_MOVIMENTO.index(val_ruolo) if val_ruolo in TUTTI_RUOLI_MOVIMENTO else TUTTI_RUOLI_MOVIMENTO.index("CC")
                     ruolo_campo = st.selectbox("Ruolo", TUTTI_RUOLI_MOVIMENTO, index=idx_ruolo, key=f"ruolo_res_{partita_sel}_{i}", label_visibility="collapsed")
 
-                c1, c2, c3, c4, c5, c6, c_voto = st.columns([1, 1, 1, 0.8, 1, 0.8, 1])
+                c1, c2, c3, c4, c5, c6, c_voto = st.columns([1, 1, 1.3, 0.8, 1, 0.8, 1])
                 with c1:
                     minuti = st.number_input("Min sub", 0, 80, int(current_vals.get("minuti", 0)), key=f"min_res_{partita_sel}_{i}")
                 with c2:
                     duelli = st.text_input("Duelli V/T", str(current_vals.get("duelli", "0/0")), key=f"due_res_{partita_sel}_{i}")
                 with c3:
-                    val_pass_res = int(current_vals.get("passaggi", 75))
-                    idx_pass_res = passaggi_opt.index(val_pass_res) if val_pass_res in passaggi_opt else 1
-                    passaggi = st.selectbox("Pass %", passaggi_opt, index=idx_pass_res, key=f"pas_res_{partita_sel}_{i}")
+                    val_eff_res = normalizza_efficacia_passaggi(current_vals.get("efficacia_passaggi", current_vals.get("passaggi", "Buona")))
+                    idx_eff_res = OPZIONI_EFFICACIA_PASSAGGI.index(val_eff_res) if val_eff_res in OPZIONI_EFFICACIA_PASSAGGI else 1
+                    efficacia_passaggi = st.selectbox("Efficacia passaggi", OPZIONI_EFFICACIA_PASSAGGI, index=idx_eff_res, key=f"pas_res_{partita_sel}_{i}")
                 with c4:
                     perse = st.number_input("Perse", 0, 10, int(current_vals.get("perse", 0)), key=f"per_res_{partita_sel}_{i}")
                 with c5:
@@ -806,7 +835,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 
                 temp_dict_res = {
                     "ruolo_campo": ruolo_campo,
-                    "minuti": minuti, "duelli": duelli, "passaggi": passaggi,
+                    "minuti": minuti, "duelli": duelli, "efficacia_passaggi": efficacia_passaggi,
                     "perse": perse, "tiri": tiri, "gol_fatti": gol_fatti, "salvataggi": 0
                 }
                 voto_live_res = calcola_voto(temp_dict_res, is_portiere=False)
@@ -961,7 +990,7 @@ elif menu == "📈 Riepilogo Squadra":
 
     tot_duelli_v = 0
     tot_duelli_t = 0
-    lista_passaggi = []
+    lista_efficacia_passaggi = []
     tot_perse = 0
     tot_tiri_p = 0
     tot_tiri_sp = 0
@@ -1008,7 +1037,9 @@ elif menu == "📈 Riepilogo Squadra":
                         d_v, d_t = parse_frazione(d_p.get("duelli", "0/0"))
                         tot_duelli_v += d_v
                         tot_duelli_t += d_t
-                        lista_passaggi.append(float(d_p.get("passaggi", 75)))
+                        lista_efficacia_passaggi.append(
+                            normalizza_efficacia_passaggi(d_p.get("efficacia_passaggi", d_p.get("passaggi", "Buona")))
+                        )
                         tot_perse += int(d_p.get("perse", 0))
                         t_p, t_sp = parse_frazione(d_p.get("tiri", "0/0"))
                         tot_tiri_p += t_p
@@ -1033,10 +1064,24 @@ elif menu == "📈 Riepilogo Squadra":
     """, unsafe_allow_html=True)
 
     if ha_dati_movimento:
-        media_pass = f"{round(sum(lista_passaggi)/len(lista_passaggi), 1)}%" if lista_passaggi else "N.D."
+        if lista_efficacia_passaggi:
+            punteggio_medio_eff = sum(DELTA_EFFICACIA_PASSAGGI[e] for e in lista_efficacia_passaggi) / len(lista_efficacia_passaggi)
+            efficacia_media_label = min(
+                OPZIONI_EFFICACIA_PASSAGGI,
+                key=lambda k: abs(DELTA_EFFICACIA_PASSAGGI[k] - punteggio_medio_eff)
+            )
+            conteggio_eff = ", ".join(
+                f"{val}: {lista_efficacia_passaggi.count(val)}"
+                for val in OPZIONI_EFFICACIA_PASSAGGI
+                if lista_efficacia_passaggi.count(val) > 0
+            )
+            valore_pass_metric = f"{efficacia_media_label} ({conteggio_eff})"
+        else:
+            valore_pass_metric = "N.D."
+
         m1, m2, m3, m4, m5 = st.columns(5)
         m1.metric("Duelli (V/T)", f"{tot_duelli_v}/{tot_duelli_t}")
-        m2.metric("Passaggi % (Media)", media_pass)
+        m2.metric("Efficacia Passaggi", valore_pass_metric)
         m3.metric("Palle Perse", tot_perse)
         m4.metric("Tiri (P/Sp)", f"{tot_tiri_p}/{tot_tiri_sp}")
         m5.metric("Gol Segnati", tot_gol)
