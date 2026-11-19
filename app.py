@@ -68,6 +68,17 @@ def parse_frazione(val_str):
         pass
     return 0, 0
 
+def hex_to_rgba(hex_color, alpha):
+    """Converte un colore HEX (#rrggbb) in stringa rgba(r, g, b, alpha)."""
+    h = (hex_color or "#10b981").lstrip("#")
+    if len(h) != 6:
+        return f"rgba(16, 185, 129, {alpha:.2f})"
+    r = int(h[0:2], 16)
+    g = int(h[2:4], 16)
+    b = int(h[4:6], 16)
+    alpha_clamped = max(0.0, min(1.0, float(alpha)))
+    return f"rgba({r}, {g}, {b}, {alpha_clamped:.2f})"
+
 # =====================================================================
 # GESTIONE LOGO & FILE PERSISTENTI (JSON)
 # =====================================================================
@@ -79,7 +90,9 @@ def salva_dati_su_disco():
     try:
         data_to_save = {
             "giocatori": st.session_state.get("database_giocatori", {}),
-            "partite": st.session_state.get("database_partite", {})
+            "partite": st.session_state.get("database_partite", {}),
+            "ui_theme": st.session_state.get("ui_theme", {}),
+            "fullscreen_mode": st.session_state.get("fullscreen_mode", False)
         }
         with open(DB_FILE, "w", encoding="utf-8") as f:
             json.dump(data_to_save, f, ensure_ascii=False, indent=4)
@@ -127,28 +140,45 @@ PRESET_TEMI = {
     "Emerald Dark (Default)": {
         "bg_main": "#090a0f", "bg_card": "#141721", "bg_sidebar": "#12141c",
         "accent": "#10b981", "text_color": "#f3f4f6", "border_color": "#1e2230",
-        "border_radius": 12, "font_size": 16, "shadow_intensity": 25, "custom_css": ""
+        "border_radius": 12, "font_size": 16, "shadow_intensity": 25,
+        "glow_intensity": 25, "glow_width": 14, "custom_css": ""
     },
     "Tactical Blue": {
         "bg_main": "#070d19", "bg_card": "#0f172a", "bg_sidebar": "#0b1120",
         "accent": "#3b82f6", "text_color": "#f8fafc", "border_color": "#1e293b",
-        "border_radius": 10, "font_size": 16, "shadow_intensity": 30, "custom_css": ""
+        "border_radius": 10, "font_size": 16, "shadow_intensity": 30,
+        "glow_intensity": 30, "glow_width": 16, "custom_css": ""
     },
     "Matchday Crimson": {
         "bg_main": "#12090b", "bg_card": "#1f1014", "bg_sidebar": "#180c0f",
         "accent": "#ef4444", "text_color": "#fef2f2", "border_color": "#381a21",
-        "border_radius": 8, "font_size": 16, "shadow_intensity": 20, "custom_css": ""
+        "border_radius": 8, "font_size": 16, "shadow_intensity": 20,
+        "glow_intensity": 25, "glow_width": 14, "custom_css": ""
     }
 }
 
+dati_salvati = carica_dati_da_disco()
+
 if "ui_theme" not in st.session_state:
-    st.session_state["ui_theme"] = PRESET_TEMI["Emerald Dark (Default)"].copy()
+    base_theme = PRESET_TEMI["Emerald Dark (Default)"].copy()
+    if dati_salvati and isinstance(dati_salvati.get("ui_theme"), dict) and dati_salvati["ui_theme"]:
+        base_theme.update(dati_salvati["ui_theme"])
+    # Garantisce chiavi nuove anche su vecchi JSON
+    base_theme.setdefault("glow_intensity", 25)
+    base_theme.setdefault("glow_width", 14)
+    base_theme.setdefault("shadow_intensity", 25)
+    base_theme.setdefault("font_size", 16)
+    st.session_state["ui_theme"] = base_theme
+
 if "fullscreen_mode" not in st.session_state:
-    st.session_state["fullscreen_mode"] = False
+    st.session_state["fullscreen_mode"] = bool(dati_salvati.get("fullscreen_mode", False)) if dati_salvati else False
+
 if "last_auto_save" not in st.session_state:
     st.session_state["last_auto_save"] = time.time()
 
-dati_salvati = carica_dati_da_disco()
+if "ui_notice" not in st.session_state:
+    st.session_state["ui_notice"] = None
+
 if dati_salvati:
     if "database_giocatori" not in st.session_state:
         st.session_state["database_giocatori"] = dati_salvati.get("giocatori", {})
@@ -187,23 +217,31 @@ tema = st.session_state["ui_theme"]
 is_fullscreen = st.session_state["fullscreen_mode"]
 
 # =====================================================================
-# APPLICAZIONE CSS & UI (CON OMBREGGIATURA ESTERNA + LEGGERO GLOW)
+# APPLICAZIONE CSS & UI (CON OMBREGGIATURA ESTERNA + GLOW DINAMICO)
 # =====================================================================
-ombra_alfa = tema["shadow_intensity"] / 100.0
-accent_hex = tema["accent"]
-box_shadow_glow = f"0 8px 20px rgba(0, 0, 0, {ombra_alfa}), 0 0 14px {accent_hex}26"
+ombra_alfa = tema.get("shadow_intensity", 25) / 100.0
+accent_hex = tema.get("accent", "#10b981")
+glow_intensita_alfa = tema.get("glow_intensity", 25) / 100.0
+glow_larghezza_px = int(tema.get("glow_width", 14))
+font_size_px = int(tema.get("font_size", 16))
+
+glow_rgba = hex_to_rgba(accent_hex, glow_intensita_alfa)
+glow_soft_rgba = hex_to_rgba(accent_hex, glow_intensita_alfa * 0.55)
+glow_border_rgba = hex_to_rgba(accent_hex, min(0.85, max(0.22, glow_intensita_alfa * 1.4)))
+
+box_shadow_glow = f"0 8px 20px rgba(0, 0, 0, {ombra_alfa:.2f}), 0 0 {glow_larghezza_px}px {glow_rgba}"
 fullscreen_css = "[data-testid=\"stSidebar\"] {display: none !important;} header {visibility: hidden !important;}" if is_fullscreen else ""
 
 st.markdown(f"""
 <style>
-    .stApp {{ background-color: {tema['bg_main']}; color: {tema['text_color']}; font-size: {tema['font_size']}px; }}
+    .stApp {{ background-color: {tema['bg_main']}; color: {tema['text_color']}; font-size: {font_size_px}px; }}
     .block-container {{ max-width: 100% !important; padding: 2rem 3rem !important; }}
     h1, h2, h3, h4, h5, h6, p, label, .stMarkdown, span {{ color: {tema['text_color']} !important; }}
     [data-testid="stSidebar"] {{ background-color: {tema['bg_sidebar']}; border-right: 1px solid {tema['border_color']}; }}
     
     [data-testid="stMetric"], div[data-baseweb="notification"], .stAlert {{
         background-color: {tema['bg_card']} !important;
-        border: 1px solid {accent_hex}44 !important;
+        border: 1px solid {glow_border_rgba} !important;
         color: {tema['text_color']} !important;
         padding: 18px;
         border-radius: {tema['border_radius']}px;
@@ -215,17 +253,17 @@ st.markdown(f"""
         background-color: #1a1d29 !important; color: #ffffff !important;
         border-radius: {tema['border_radius']}px !important; border: 1px solid {tema['border_color']} !important; font-weight: 600 !important;
         padding: 0.6rem 1.2rem !important; width: 100% !important;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, {max(0.15, ombra_alfa * 0.8)}), 0 0 8px {accent_hex}14;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, {max(0.15, ombra_alfa * 0.8):.2f}), 0 0 {max(4, glow_larghezza_px // 2)}px {glow_soft_rgba};
         transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
     }}
     .stButton > button:hover, .stDownloadButton > button:hover {{
         background-color: #ef4444 !important; border-color: #ef4444 !important; color: #ffffff !important;
-        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35), 0 0 14px rgba(239, 68, 68, 0.35);
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35), 0 0 {glow_larghezza_px}px rgba(239, 68, 68, 0.45);
     }}
 
     [data-testid="stExpander"] {{
         background-color: {tema['bg_card']} !important;
-        border: 1px solid {accent_hex}44 !important;
+        border: 1px solid {glow_border_rgba} !important;
         border-radius: {tema['border_radius']}px !important;
         box-shadow: {box_shadow_glow};
     }}
@@ -249,15 +287,36 @@ st.markdown(f"""
         background-color: {tema['bg_card']};
         border-radius: {tema['border_radius']}px;
         overflow: hidden;
-        border: 1px solid {accent_hex}38;
+        border: 1px solid {glow_border_rgba};
         width: 100% !important;
         box-shadow: {box_shadow_glow};
     }}
     th {{ background-color: {accent_hex} !important; color: #ffffff !important; text-align: center !important; }}
     td {{ color: {tema['text_color']} !important; border-color: {tema['border_color']} !important; }}
+
+    .scoutai-theme-toast {{
+        background-color: {tema['bg_card']};
+        border: 1px solid {accent_hex};
+        border-left: 5px solid {accent_hex};
+        border-radius: {tema['border_radius']}px;
+        padding: 14px 18px;
+        margin: 10px 0 18px 0;
+        box-shadow: 0 10px 24px rgba(0, 0, 0, {max(0.25, ombra_alfa):.2f}), 0 0 {max(10, glow_larghezza_px + 4)}px {glow_rgba};
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }}
     {fullscreen_css}
 </style>
 """, unsafe_allow_html=True)
+
+def mostra_notifica_tema(messaggio, icona="✅"):
+    st.markdown(f"""
+    <div class="scoutai-theme-toast">
+        <span style="font-size: 20px; line-height: 1;">{icona}</span>
+        <div style="font-weight: 600; color: {tema['text_color']};">{messaggio}</div>
+    </div>
+    """, unsafe_allow_html=True)
 
 # =====================================================================
 # HEADER CON LOGO IN ALTO A SINISTRA
@@ -598,7 +657,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 voto_live = calcola_voto(temp_dict, is_portiere=True)
                 
                 with c_voto:
-                    st.markdown(f"<div style='background-color: #1e2230; border: 1px solid {accent_hex}; box-shadow: 0 0 10px {accent_hex}28; padding: 8px; border-radius: 8px; text-align: center; margin-top: 24px;'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live}</span></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='background-color: #1e2230; border: 1px solid {accent_hex}; box-shadow: 0 0 {max(6, glow_larghezza_px)}px {glow_rgba}; padding: 8px; border-radius: 8px; text-align: center; margin-top: 24px;'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live}</span></div>", unsafe_allow_html=True)
 
                 p_dati["dati_prestazione"][nome_g] = temp_dict
             else:
@@ -634,7 +693,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 voto_live = calcola_voto(temp_dict, is_portiere=False)
                 
                 with c_voto:
-                    st.markdown(f"<div style='background-color: #1e2230; border: 1px solid {accent_hex}; box-shadow: 0 0 10px {accent_hex}28; padding: 8px; border-radius: 8px; text-align: center; margin-top: 24px;'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live}</span></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='background-color: #1e2230; border: 1px solid {accent_hex}; box-shadow: 0 0 {max(6, glow_larghezza_px)}px {glow_rgba}; padding: 8px; border-radius: 8px; text-align: center; margin-top: 24px;'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live}</span></div>", unsafe_allow_html=True)
 
                 p_dati["dati_prestazione"][nome_g] = temp_dict
 
@@ -667,7 +726,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 voto_live_res = calcola_voto(temp_dict_res, is_portiere=True)
                 
                 with c_voto:
-                    st.markdown(f"<div style='background-color: #1e2230; border: 1px solid {accent_hex}; box-shadow: 0 0 10px {accent_hex}28; padding: 8px; border-radius: 8px; text-align: center; margin-top: 24px;'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live_res}</span></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='background-color: #1e2230; border: 1px solid {accent_hex}; box-shadow: 0 0 {max(6, glow_larghezza_px)}px {glow_rgba}; padding: 8px; border-radius: 8px; text-align: center; margin-top: 24px;'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live_res}</span></div>", unsafe_allow_html=True)
 
                 p_dati["dati_prestazione"][nome_g] = temp_dict_res
             else:
@@ -703,7 +762,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 voto_live_res = calcola_voto(temp_dict_res, is_portiere=False)
                 
                 with c_voto:
-                    st.markdown(f"<div style='background-color: #1e2230; border: 1px solid {accent_hex}; box-shadow: 0 0 10px {accent_hex}28; padding: 8px; border-radius: 8px; text-align: center; margin-top: 24px;'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live_res}</span></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='background-color: #1e2230; border: 1px solid {accent_hex}; box-shadow: 0 0 {max(6, glow_larghezza_px)}px {glow_rgba}; padding: 8px; border-radius: 8px; text-align: center; margin-top: 24px;'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live_res}</span></div>", unsafe_allow_html=True)
 
                 p_dati["dati_prestazione"][nome_g] = temp_dict_res
 
@@ -791,14 +850,14 @@ elif menu == "🎥 Video Analisi":
             st.markdown(f"""
                 <div style="position: relative; width: 100%; height: 0; padding-bottom: 56.25%;">
                     <iframe src="{embed_url}" 
-                            style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 12px; border: 1px solid {accent_hex}55; box-shadow: {box_shadow_glow};" 
+                            style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 12px; border: 1px solid {glow_border_rgba}; box-shadow: {box_shadow_glow};" 
                             allowfullscreen>
                     </iframe>
                 </div>
             """, unsafe_allow_html=True)
         else:
             st.markdown(f"""
-                <div style="background-color: {tema['bg_card']}; border: 2px dashed {accent_hex}55; border-radius: 12px; height: 320px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; box-shadow: {box_shadow_glow};">
+                <div style="background-color: {tema['bg_card']}; border: 2px dashed {glow_border_rgba}; border-radius: 12px; height: 320px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; box-shadow: {box_shadow_glow};">
                     <span style="font-size: 40px; margin-bottom: 10px;">📺</span>
                     <p style="color: #a0aec0; margin: 0; font-size: 16px;">Nessun video caricato o link YouTube non valido.</p>
                     <p style="color: #718096; margin-top: 5px; font-size: 13px;">Inserisci un link valido nel pannello a sinistra e premi Play.</p>
@@ -919,7 +978,7 @@ elif menu == "📈 Riepilogo Squadra":
 
     # 1. Conteggio totale parametri inseriti (PRIMA di presenze e minutaggio)
     st.markdown(f"""
-    <div style="background-color: {tema['bg_card']}; border: 1px solid {accent_hex}48; border-radius: {tema['border_radius']}px; padding: 20px; box-shadow: {box_shadow_glow}; margin-bottom: 18px;">
+    <div style="background-color: {tema['bg_card']}; border: 1px solid {glow_border_rgba}; border-radius: {tema['border_radius']}px; padding: 20px; box-shadow: {box_shadow_glow}; margin-bottom: 18px;">
         <h4 style="margin-top: 0; color: {accent_hex}; border-bottom: 1px solid {tema['border_color']}; padding-bottom: 10px;">🧮 Conteggio Totale Parametri Inseriti: {giocatore_sel}</h4>
     """, unsafe_allow_html=True)
 
@@ -945,7 +1004,7 @@ elif menu == "📈 Riepilogo Squadra":
 
     # 2. Dettaglio Presenze & Minutaggio (DOPO il conteggio parametri)
     st.markdown(f"""
-    <div style="background-color: {tema['bg_card']}; border: 1px solid {accent_hex}48; border-radius: {tema['border_radius']}px; padding: 20px; box-shadow: {box_shadow_glow};">
+    <div style="background-color: {tema['bg_card']}; border: 1px solid {glow_border_rgba}; border-radius: {tema['border_radius']}px; padding: 20px; box-shadow: {box_shadow_glow};">
         <h4 style="margin-top: 0; color: {accent_hex}; border-bottom: 1px solid {tema['border_color']}; padding-bottom: 10px;">📋 Dettaglio Presenze & Minutaggio: {giocatore_sel}</h4>
         <div style="display: flex; justify-content: space-around; text-align: center; margin-top: 15px;">
             <div>
@@ -1060,17 +1119,80 @@ elif menu == "👤 Gestione Rosa":
 # =====================================================================
 elif menu == "🎨 Editor Grafica":
     st.title("🎨 Editor Grafica & Impostazioni UI")
-    
-    attiva_fs = st.toggle("Abilita Modalità Fullscreen (Tutto Schermo)", value=st.session_state["fullscreen_mode"])
-    if attiva_fs != st.session_state["fullscreen_mode"]:
-        st.session_state["fullscreen_mode"] = attiva_fs
-        salva_dati_su_disco()
-        st.rerun()
 
+    if st.session_state.get("ui_notice"):
+        mostra_notifica_tema(st.session_state["ui_notice"], icona="✨")
+        st.session_state["ui_notice"] = None
+
+    st.subheader("🎭 Preset Tema")
     cols_preset = st.columns(len(PRESET_TEMI))
     for idx, (n_preset, v_preset) in enumerate(PRESET_TEMI.items()):
         with cols_preset[idx]:
-            if st.button(n_preset, use_container_width=True):
+            if st.button(n_preset, use_container_width=True, key=f"preset_{idx}"):
                 st.session_state["ui_theme"] = v_preset.copy()
                 salva_dati_su_disco()
+                st.session_state["ui_notice"] = f"Preset '{n_preset}' applicato e salvato con successo."
                 st.rerun()
+
+    st.divider()
+    st.subheader("🎛️ Personalizzazione Font, Glow dei Box & Schermo")
+
+    attiva_fs = st.toggle(
+        "Abilita Modalità Fullscreen (Tutto Schermo)",
+        value=st.session_state["fullscreen_mode"],
+        key="toggle_fs_editor"
+    )
+
+    col_f1, col_f2 = st.columns(2)
+    with col_f1:
+        nuovo_font_size = st.slider(
+            "Dimensione Font (px)",
+            min_value=13,
+            max_value=22,
+            value=int(tema.get("font_size", 16)),
+            step=1,
+            key="slider_font_size"
+        )
+    with col_f2:
+        nuova_ombra = st.slider(
+            "Ombreggiatura Esterna Box (%)",
+            min_value=0,
+            max_value=80,
+            value=int(tema.get("shadow_intensity", 25)),
+            step=5,
+            key="slider_shadow_intensity"
+        )
+
+    col_g1, col_g2 = st.columns(2)
+    with col_g1:
+        nuova_glow_intensita = st.slider(
+            "Intensità Glow Box (%)",
+            min_value=0,
+            max_value=85,
+            value=int(tema.get("glow_intensity", 25)),
+            step=5,
+            key="slider_glow_intensity"
+        )
+    with col_g2:
+        nuova_glow_larghezza = st.slider(
+            "Larghezza Glow Box (px)",
+            min_value=0,
+            max_value=40,
+            value=int(tema.get("glow_width", 14)),
+            step=2,
+            key="slider_glow_width"
+        )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("💾 Salva Impostazioni Grafiche", use_container_width=True, key="btn_salva_grafica"):
+        st.session_state["ui_theme"]["font_size"] = int(nuovo_font_size)
+        st.session_state["ui_theme"]["shadow_intensity"] = int(nuova_ombra)
+        st.session_state["ui_theme"]["glow_intensity"] = int(nuova_glow_intensita)
+        st.session_state["ui_theme"]["glow_width"] = int(nuova_glow_larghezza)
+        st.session_state["fullscreen_mode"] = bool(attiva_fs)
+        salva_dati_su_disco()
+        st.session_state["ui_notice"] = (
+            f"Modifiche salvate e applicate! Font: {nuovo_font_size}px · "
+            f"Glow: {nuova_glow_intensita}% / {nuova_glow_larghezza}px."
+        )
+        st.rerun()
