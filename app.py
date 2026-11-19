@@ -163,7 +163,6 @@ if "ui_theme" not in st.session_state:
     base_theme = PRESET_TEMI["Emerald Dark (Default)"].copy()
     if dati_salvati and isinstance(dati_salvati.get("ui_theme"), dict) and dati_salvati["ui_theme"]:
         base_theme.update(dati_salvati["ui_theme"])
-    # Garantisce chiavi nuove anche su vecchi JSON
     base_theme.setdefault("glow_intensity", 25)
     base_theme.setdefault("glow_width", 14)
     base_theme.setdefault("shadow_intensity", 25)
@@ -217,19 +216,21 @@ tema = st.session_state["ui_theme"]
 is_fullscreen = st.session_state["fullscreen_mode"]
 
 # =====================================================================
-# APPLICAZIONE CSS & UI (CON OMBREGGIATURA ESTERNA + GLOW DINAMICO)
+# APPLICAZIONE CSS & UI (GLOW + OMBREGGIATURA ESTERNA SU TUTTI I BOX)
 # =====================================================================
 ombra_alfa = tema.get("shadow_intensity", 25) / 100.0
 accent_hex = tema.get("accent", "#10b981")
 glow_intensita_alfa = tema.get("glow_intensity", 25) / 100.0
 glow_larghezza_px = int(tema.get("glow_width", 14))
 font_size_px = int(tema.get("font_size", 16))
+radius_px = int(tema.get("border_radius", 12))
 
 glow_rgba = hex_to_rgba(accent_hex, glow_intensita_alfa)
 glow_soft_rgba = hex_to_rgba(accent_hex, glow_intensita_alfa * 0.55)
 glow_border_rgba = hex_to_rgba(accent_hex, min(0.85, max(0.22, glow_intensita_alfa * 1.4)))
 
 box_shadow_glow = f"0 8px 20px rgba(0, 0, 0, {ombra_alfa:.2f}), 0 0 {glow_larghezza_px}px {glow_rgba}"
+box_shadow_soft = f"0 4px 12px rgba(0, 0, 0, {max(0.15, ombra_alfa * 0.75):.2f}), 0 0 {max(4, (glow_larghezza_px * 2) // 3)}px {glow_soft_rgba}"
 fullscreen_css = "[data-testid=\"stSidebar\"] {display: none !important;} header {visibility: hidden !important;}" if is_fullscreen else ""
 
 st.markdown(f"""
@@ -237,23 +238,36 @@ st.markdown(f"""
     .stApp {{ background-color: {tema['bg_main']}; color: {tema['text_color']}; font-size: {font_size_px}px; }}
     .block-container {{ max-width: 100% !important; padding: 2rem 3rem !important; }}
     h1, h2, h3, h4, h5, h6, p, label, .stMarkdown, span {{ color: {tema['text_color']} !important; }}
-    [data-testid="stSidebar"] {{ background-color: {tema['bg_sidebar']}; border-right: 1px solid {tema['border_color']}; }}
-    
-    [data-testid="stMetric"], div[data-baseweb="notification"], .stAlert {{
+
+    [data-testid="stSidebar"] {{
+        background-color: {tema['bg_sidebar']};
+        border-right: 1px solid {glow_border_rgba};
+        box-shadow: 4px 0 18px rgba(0, 0, 0, {max(0.2, ombra_alfa):.2f}), 0 0 {max(6, glow_larghezza_px)}px {glow_soft_rgba};
+    }}
+
+    [data-testid="stForm"] {{
+        background-color: {tema['bg_card']} !important;
+        border: 1px solid {glow_border_rgba} !important;
+        border-radius: {radius_px}px !important;
+        padding: 20px !important;
+        box-shadow: {box_shadow_glow};
+    }}
+
+    [data-testid="stMetric"], div[data-baseweb="notification"], .stAlert, [data-testid="stFileUploader"] > section {{
         background-color: {tema['bg_card']} !important;
         border: 1px solid {glow_border_rgba} !important;
         color: {tema['text_color']} !important;
         padding: 18px;
-        border-radius: {tema['border_radius']}px;
+        border-radius: {radius_px}px;
         box-shadow: {box_shadow_glow};
     }}
     [data-testid="stMetricValue"] {{ color: {accent_hex} !important; }}
 
     .stButton > button, .stDownloadButton > button {{
         background-color: #1a1d29 !important; color: #ffffff !important;
-        border-radius: {tema['border_radius']}px !important; border: 1px solid {tema['border_color']} !important; font-weight: 600 !important;
+        border-radius: {radius_px}px !important; border: 1px solid {glow_border_rgba} !important; font-weight: 600 !important;
         padding: 0.6rem 1.2rem !important; width: 100% !important;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, {max(0.15, ombra_alfa * 0.8):.2f}), 0 0 {max(4, glow_larghezza_px // 2)}px {glow_soft_rgba};
+        box-shadow: {box_shadow_soft};
         transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
     }}
     .stButton > button:hover, .stDownloadButton > button:hover {{
@@ -264,7 +278,7 @@ st.markdown(f"""
     [data-testid="stExpander"] {{
         background-color: {tema['bg_card']} !important;
         border: 1px solid {glow_border_rgba} !important;
-        border-radius: {tema['border_radius']}px !important;
+        border-radius: {radius_px}px !important;
         box-shadow: {box_shadow_glow};
     }}
     [data-testid="stExpander"] summary {{
@@ -279,13 +293,17 @@ st.markdown(f"""
         width: 100% !important;
     }}
 
-    input, textarea, select, div[data-baseweb="input"] div, div[data-baseweb="select"] div {{
-        background-color: {tema['bg_card']} !important; color: {tema['text_color']} !important;
-        border-color: {tema['border_color']} !important; border-radius: {max(4, tema['border_radius']-4)}px !important;
+    input, textarea, select, div[data-baseweb="input"] > div, div[data-baseweb="select"] > div {{
+        background-color: {tema['bg_card']} !important;
+        color: {tema['text_color']} !important;
+        border-color: {glow_border_rgba} !important;
+        border-radius: {max(4, radius_px - 4)}px !important;
+        box-shadow: {box_shadow_soft};
     }}
+
     table {{
         background-color: {tema['bg_card']};
-        border-radius: {tema['border_radius']}px;
+        border-radius: {radius_px}px;
         overflow: hidden;
         border: 1px solid {glow_border_rgba};
         width: 100% !important;
@@ -294,11 +312,43 @@ st.markdown(f"""
     th {{ background-color: {accent_hex} !important; color: #ffffff !important; text-align: center !important; }}
     td {{ color: {tema['text_color']} !important; border-color: {tema['border_color']} !important; }}
 
+    .scoutai-box {{
+        background-color: {tema['bg_card']};
+        border: 1px solid {glow_border_rgba};
+        border-radius: {radius_px}px;
+        padding: 20px;
+        box-shadow: {box_shadow_glow};
+    }}
+
+    .scoutai-voto-box {{
+        background-color: #1e2230;
+        border: 1px solid {accent_hex};
+        box-shadow: {box_shadow_glow};
+        padding: 8px;
+        border-radius: {max(6, radius_px - 4)}px;
+        text-align: center;
+        margin-top: 24px;
+    }}
+
+    .scoutai-video-empty {{
+        background-color: {tema['bg_card']};
+        border: 2px dashed {glow_border_rgba};
+        border-radius: {radius_px}px;
+        height: 320px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 20px;
+        box-shadow: {box_shadow_glow};
+    }}
+
     .scoutai-theme-toast {{
         background-color: {tema['bg_card']};
         border: 1px solid {accent_hex};
         border-left: 5px solid {accent_hex};
-        border-radius: {tema['border_radius']}px;
+        border-radius: {radius_px}px;
         padding: 14px 18px;
         margin: 10px 0 18px 0;
         box-shadow: 0 10px 24px rgba(0, 0, 0, {max(0.25, ombra_alfa):.2f}), 0 0 {max(10, glow_larghezza_px + 4)}px {glow_rgba};
@@ -657,7 +707,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 voto_live = calcola_voto(temp_dict, is_portiere=True)
                 
                 with c_voto:
-                    st.markdown(f"<div style='background-color: #1e2230; border: 1px solid {accent_hex}; box-shadow: 0 0 {max(6, glow_larghezza_px)}px {glow_rgba}; padding: 8px; border-radius: 8px; text-align: center; margin-top: 24px;'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live}</span></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='scoutai-voto-box'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live}</span></div>", unsafe_allow_html=True)
 
                 p_dati["dati_prestazione"][nome_g] = temp_dict
             else:
@@ -693,7 +743,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 voto_live = calcola_voto(temp_dict, is_portiere=False)
                 
                 with c_voto:
-                    st.markdown(f"<div style='background-color: #1e2230; border: 1px solid {accent_hex}; box-shadow: 0 0 {max(6, glow_larghezza_px)}px {glow_rgba}; padding: 8px; border-radius: 8px; text-align: center; margin-top: 24px;'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live}</span></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='scoutai-voto-box'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live}</span></div>", unsafe_allow_html=True)
 
                 p_dati["dati_prestazione"][nome_g] = temp_dict
 
@@ -726,7 +776,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 voto_live_res = calcola_voto(temp_dict_res, is_portiere=True)
                 
                 with c_voto:
-                    st.markdown(f"<div style='background-color: #1e2230; border: 1px solid {accent_hex}; box-shadow: 0 0 {max(6, glow_larghezza_px)}px {glow_rgba}; padding: 8px; border-radius: 8px; text-align: center; margin-top: 24px;'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live_res}</span></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='scoutai-voto-box'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live_res}</span></div>", unsafe_allow_html=True)
 
                 p_dati["dati_prestazione"][nome_g] = temp_dict_res
             else:
@@ -762,7 +812,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 voto_live_res = calcola_voto(temp_dict_res, is_portiere=False)
                 
                 with c_voto:
-                    st.markdown(f"<div style='background-color: #1e2230; border: 1px solid {accent_hex}; box-shadow: 0 0 {max(6, glow_larghezza_px)}px {glow_rgba}; padding: 8px; border-radius: 8px; text-align: center; margin-top: 24px;'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live_res}</span></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='scoutai-voto-box'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live_res}</span></div>", unsafe_allow_html=True)
 
                 p_dati["dati_prestazione"][nome_g] = temp_dict_res
 
@@ -850,14 +900,14 @@ elif menu == "🎥 Video Analisi":
             st.markdown(f"""
                 <div style="position: relative; width: 100%; height: 0; padding-bottom: 56.25%;">
                     <iframe src="{embed_url}" 
-                            style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 12px; border: 1px solid {glow_border_rgba}; box-shadow: {box_shadow_glow};" 
+                            style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: {radius_px}px; border: 1px solid {glow_border_rgba}; box-shadow: {box_shadow_glow};" 
                             allowfullscreen>
                     </iframe>
                 </div>
             """, unsafe_allow_html=True)
         else:
-            st.markdown(f"""
-                <div style="background-color: {tema['bg_card']}; border: 2px dashed {glow_border_rgba}; border-radius: 12px; height: 320px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; box-shadow: {box_shadow_glow};">
+            st.markdown("""
+                <div class="scoutai-video-empty">
                     <span style="font-size: 40px; margin-bottom: 10px;">📺</span>
                     <p style="color: #a0aec0; margin: 0; font-size: 16px;">Nessun video caricato o link YouTube non valido.</p>
                     <p style="color: #718096; margin-top: 5px; font-size: 13px;">Inserisci un link valido nel pannello a sinistra e premi Play.</p>
@@ -978,7 +1028,7 @@ elif menu == "📈 Riepilogo Squadra":
 
     # 1. Conteggio totale parametri inseriti (PRIMA di presenze e minutaggio)
     st.markdown(f"""
-    <div style="background-color: {tema['bg_card']}; border: 1px solid {glow_border_rgba}; border-radius: {tema['border_radius']}px; padding: 20px; box-shadow: {box_shadow_glow}; margin-bottom: 18px;">
+    <div class="scoutai-box" style="margin-bottom: 18px;">
         <h4 style="margin-top: 0; color: {accent_hex}; border-bottom: 1px solid {tema['border_color']}; padding-bottom: 10px;">🧮 Conteggio Totale Parametri Inseriti: {giocatore_sel}</h4>
     """, unsafe_allow_html=True)
 
@@ -1004,7 +1054,7 @@ elif menu == "📈 Riepilogo Squadra":
 
     # 2. Dettaglio Presenze & Minutaggio (DOPO il conteggio parametri)
     st.markdown(f"""
-    <div style="background-color: {tema['bg_card']}; border: 1px solid {glow_border_rgba}; border-radius: {tema['border_radius']}px; padding: 20px; box-shadow: {box_shadow_glow};">
+    <div class="scoutai-box">
         <h4 style="margin-top: 0; color: {accent_hex}; border-bottom: 1px solid {tema['border_color']}; padding-bottom: 10px;">📋 Dettaglio Presenze & Minutaggio: {giocatore_sel}</h4>
         <div style="display: flex; justify-content: space-around; text-align: center; margin-top: 15px;">
             <div>
@@ -1106,7 +1156,7 @@ elif menu == "👤 Gestione Rosa":
         for nome, dati in list(db_giocatori.items()):
             c1, c2 = st.columns([3, 1])
             with c1:
-                st.write(f"📌 **{nome}** — *Ruolo:* {dati['ruolo']}")
+                st.markdown(f"<div class='scoutai-box' style='padding: 12px 16px; margin-bottom: 8px;'>📌 <strong>{nome}</strong> — <em>Ruolo:</em> {dati['ruolo']}</div>", unsafe_allow_html=True)
             with c2:
                 if st.button("🗑️ Elimina", key=f"del_g_{nome}"):
                     del db_giocatori[nome]
