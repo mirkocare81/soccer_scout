@@ -58,6 +58,16 @@ def ruolo_default_da_rosa(ruolo_rosa_str):
         return "TQ"
     return "CC"
 
+def parse_frazione(val_str):
+    """Restituisce (numeratore, denominatore) da stringhe tipo '5/5' o '0/1'."""
+    try:
+        parti = str(val_str).strip().split("/")
+        if len(parti) == 2:
+            return int(parti[0].strip()), int(parti[1].strip())
+    except Exception:
+        pass
+    return 0, 0
+
 # =====================================================================
 # GESTIONE LOGO & FILE PERSISTENTI (JSON)
 # =====================================================================
@@ -282,30 +292,25 @@ def calcola_voto(p, is_portiere=False):
 
             pct_duelli = (duelli_v / duelli_t) if duelli_t > 0 else 0
 
-            # Pesi parametri per macro-ruolo
             if macro_ruolo == "DIFENSORE":
-                # Difensori: pesano molto i duelli, meno passaggi, perse e tiri
                 peso_duelli = 1.8
                 peso_passaggi = 0.5
                 peso_perse = 0.5
                 peso_tiri = 0.5
                 soglia_duelli_min = 2
             elif macro_ruolo == "CENTROCAMPISTA":
-                # Centrocampisti: pesano molto palle perse e passaggi, meno duelli e tiri
                 peso_duelli = 0.7
                 peso_passaggi = 1.7
                 peso_perse = 1.7
                 peso_tiri = 0.6
                 soglia_duelli_min = 3
             else:
-                # Attaccanti: pesano molto i tiri, meno duelli, passaggi e perse
                 peso_duelli = 0.6
                 peso_passaggi = 0.5
                 peso_perse = 0.6
                 peso_tiri = 1.9
                 soglia_duelli_min = 2
 
-            # 1. Duelli
             if pct_duelli >= 0.75 and duelli_t >= soglia_duelli_min:
                 rating += (0.4 * peso_duelli) * min(1.0, fattore_tempo + 0.2)
             elif pct_duelli >= 0.55 and duelli_t >= soglia_duelli_min and macro_ruolo == "DIFENSORE":
@@ -313,17 +318,14 @@ def calcola_voto(p, is_portiere=False):
             elif pct_duelli < 0.40 and duelli_t > 0:
                 rating -= (0.4 * peso_duelli) * fattore_tempo
 
-            # 2. Passaggi %
             if pct_passaggi >= 0.85:
                 rating += 0.3 * peso_passaggi
             elif pct_passaggi < 0.50:
                 rating -= (0.3 * peso_passaggi) * fattore_tempo
 
-            # 3. Palle perse
             if perse > 0:
                 rating -= (perse * 0.6 * peso_perse) * fattore_tempo
 
-            # 4. Tiri (Porta / Specchio)
             if tiri_specchio > 0:
                 efficacia = tiri_porta / tiri_specchio
                 if efficacia >= 0.66:
@@ -331,7 +333,6 @@ def calcola_voto(p, is_portiere=False):
                 elif tiri_specchio >= 2 and efficacia < 0.30:
                     rating -= (0.2 * peso_tiri) * fattore_tempo
 
-            # 5. Gol fatti (+1 per tutti)
             if gol_fatti > 0:
                 rating += (gol_fatti * 1.0)
 
@@ -534,7 +535,7 @@ if menu == "📋 Setup Partite & Formazioni":
                 st.rerun()
 
 # =====================================================================
-# 2. INSERIMENTO PARAMETRI & VOTI (CON RUOLO SPECIFICO & PESI DEDICATI)
+# 2. INSERIMENTO PARAMETRI & VOTI
 # =====================================================================
 elif menu == "⚡ Inserimento Parametri & Voti":
     st.title("⚡ Inserimento Parametri Post-Partita & Voti")
@@ -832,7 +833,24 @@ elif menu == "📈 Riepilogo Squadra":
     presenze_titolare = 0
     presenze_subentro = 0
 
-    for p_nome, p_val in db_partite.items():
+    # Conteggi totali parametri inseriti
+    tot_duelli_v = 0
+    tot_duelli_t = 0
+    lista_passaggi = []
+    tot_perse = 0
+    tot_tiri_p = 0
+    tot_tiri_sp = 0
+    tot_gol = 0
+
+    tot_parate = 0
+    tot_uscite_v = 0
+    tot_uscite_t = 0
+    tot_gol_sub = 0
+    tot_gol_resp = 0
+    ha_dati_portiere = False
+    ha_dati_movimento = False
+
+    for p_nome, p_val in partite_ordinate:
         formazione = p_val.get("formazione", {})
         for n, nome in formazione.items():
             if nome == giocatore_sel:
@@ -840,9 +858,9 @@ elif menu == "📈 Riepilogo Squadra":
                 if d_p:
                     min_giocati = int(d_p.get("minuti", 0))
                     num_maglia = int(n) if str(n).isdigit() else 0
+                    is_portiere = (str(n) in ["1", "12"])
 
                     if min_giocati > 0:
-                        is_portiere = (str(n) in ["1", "12"])
                         storico_voti.append(calcola_voto(d_p, is_portiere))
                         tot_minuti += min_giocati
 
@@ -850,6 +868,28 @@ elif menu == "📈 Riepilogo Squadra":
                             presenze_titolare += 1
                         elif 12 <= num_maglia <= 20:
                             presenze_subentro += 1
+
+                    # Somma totale di tutti i parametri inseriti per il giocatore
+                    if "parate" in d_p or "uscite" in d_p or "gol_subiti_resp" in d_p:
+                        ha_dati_portiere = True
+                        tot_parate += int(d_p.get("parate", 0))
+                        u_v, u_t = parse_frazione(d_p.get("uscite", "0/0"))
+                        tot_uscite_v += u_v
+                        tot_uscite_t += u_t
+                        g_s, g_r = parse_frazione(d_p.get("gol_subiti_resp", "0/0"))
+                        tot_gol_sub += g_s
+                        tot_gol_resp += g_r
+                    else:
+                        ha_dati_movimento = True
+                        d_v, d_t = parse_frazione(d_p.get("duelli", "0/0"))
+                        tot_duelli_v += d_v
+                        tot_duelli_t += d_t
+                        lista_passaggi.append(float(d_p.get("passaggi", 75)))
+                        tot_perse += int(d_p.get("perse", 0))
+                        t_p, t_sp = parse_frazione(d_p.get("tiri", "0/0"))
+                        tot_tiri_p += t_p
+                        tot_tiri_sp += t_sp
+                        tot_gol += int(d_p.get("gol_fatti", 0))
 
     tot_presenze = presenze_titolare + presenze_subentro
     media_stagione = round(sum(storico_voti)/len(storico_voti), 1) if storico_voti else 6.0
@@ -862,6 +902,33 @@ elif menu == "📈 Riepilogo Squadra":
 
     st.markdown("<br>", unsafe_allow_html=True)
 
+    # 1. Conteggio totale parametri inseriti (PRIMA di presenze e minutaggio)
+    st.markdown(f"""
+    <div style="background-color: {tema['bg_card']}; border: 1px solid {tema['border_color']}; border-radius: {tema['border_radius']}px; padding: 20px; box-shadow: 0 6px 14px rgba(0,0,0,{ombra_alfa}); margin-bottom: 18px;">
+        <h4 style="margin-top: 0; color: {tema['accent']}; border-bottom: 1px solid {tema['border_color']}; padding-bottom: 10px;">🧮 Conteggio Totale Parametri Inseriti: {giocatore_sel}</h4>
+    """, unsafe_allow_html=True)
+
+    if ha_dati_movimento:
+        media_pass = f"{round(sum(lista_passaggi)/len(lista_passaggi), 1)}%" if lista_passaggi else "N.D."
+        m1, m2, m3, m4, m5 = st.columns(5)
+        m1.metric("Duelli (V/T)", f"{tot_duelli_v}/{tot_duelli_t}")
+        m2.metric("Passaggi % (Media)", media_pass)
+        m3.metric("Palle Perse", tot_perse)
+        m4.metric("Tiri (P/Sp)", f"{tot_tiri_p}/{tot_tiri_sp}")
+        m5.metric("Gol Segnati", tot_gol)
+
+    if ha_dati_portiere:
+        p1, p2, p3 = st.columns(3)
+        p1.metric("Parate Totali", tot_parate)
+        p2.metric("Uscite (Rius./Tent.)", f"{tot_uscite_v}/{tot_uscite_t}")
+        p3.metric("Gol Subiti / Respinti", f"{tot_gol_sub}/{tot_gol_resp}")
+
+    if not ha_dati_movimento and not ha_dati_portiere:
+        st.info("Nessun parametro registrato per questo giocatore.")
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # 2. Dettaglio Presenze & Minutaggio (DOPO il conteggio parametri)
     st.markdown(f"""
     <div style="background-color: {tema['bg_card']}; border: 1px solid {tema['border_color']}; border-radius: {tema['border_radius']}px; padding: 20px; box-shadow: 0 6px 14px rgba(0,0,0,{ombra_alfa});">
         <h4 style="margin-top: 0; color: {tema['accent']}; border-bottom: 1px solid {tema['border_color']}; padding-bottom: 10px;">📋 Dettaglio Presenze & Minutaggio: {giocatore_sel}</h4>
