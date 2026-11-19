@@ -209,10 +209,33 @@ def hex_to_rgba(hex_color, alpha):
     return f"rgba({r}, {g}, {b}, {alpha_clamped:.2f})"
 
 # =====================================================================
-# GESTIONE LOGO & FILE PERSISTENTI (JSON)
+# GESTIONE LOGO, FOTO GIOCATORI & FILE PERSISTENTI (JSON)
 # =====================================================================
 LOGO_PATH = "Channel logo.jpg" if os.path.exists("Channel logo.jpg") else ("logo.png" if os.path.exists("logo.png") else None)
 DB_FILE = "scoutai_database.json"
+PLAYER_PHOTOS_DIR = "player_photos"
+
+def salva_foto_giocatore(nome_giocatore, uploaded_file):
+    """Salva l'immagine caricata in player_photos/ e restituisce il percorso relativo."""
+    if not uploaded_file or not nome_giocatore:
+        return None
+    os.makedirs(PLAYER_PHOTOS_DIR, exist_ok=True)
+    ext = os.path.splitext(uploaded_file.name or "")[1].lower()
+    if ext not in [".png", ".jpg", ".jpeg", ".webp"]:
+        ext = ".png"
+    safe_slug = re.sub(r"[^a-zA-Z0-9_-]+", "_", nome_giocatore.strip()).strip("_") or "giocatore"
+    file_path = os.path.join(PLAYER_PHOTOS_DIR, f"{safe_slug}{ext}")
+    uploaded_file.seek(0)
+    with open(file_path, "wb") as f:
+        f.write(uploaded_file.getbuffer())
+    return file_path
+
+def ottieni_foto_valida(nome_giocatore, db_giocatori):
+    """Restituisce il percorso della foto se esiste davvero su disco, altrimenti None."""
+    foto_path = db_giocatori.get(nome_giocatore, {}).get("foto_path")
+    if foto_path and os.path.exists(foto_path):
+        return foto_path
+    return None
 
 def salva_dati_su_disco():
     """Salvataggio automatico istantaneo su file JSON"""
@@ -318,20 +341,20 @@ if dati_salvati:
 else:
     if "database_giocatori" not in st.session_state:
         st.session_state["database_giocatori"] = {
-            "Lorenzo": {"ruolo": "Portiere (POR)", "partite": {}},
-            "Mattia": {"ruolo": "Difensore Centrale (DC)", "partite": {}},
-            "Filippo": {"ruolo": "Centrocampista (CC)", "partite": {}},
-            "Davide": {"ruolo": "Attaccante (ATT)", "partite": {}},
-            "Simone": {"ruolo": "Terzino (TS/TD)", "partite": {}},
-            "Federico": {"ruolo": "Centrocampista (CC)", "partite": {}},
-            "Alessandro": {"ruolo": "Attaccante (ATT)", "partite": {}},
-            "Luca": {"ruolo": "Difensore Centrale (DC)", "partite": {}},
-            "Marco": {"ruolo": "Esterno (EST)", "partite": {}},
-            "Giovanni": {"ruolo": "Centrocampista (CC)", "partite": {}},
-            "Tommaso": {"ruolo": "Attaccante (ATT)", "partite": {}},
-            "Pietro": {"ruolo": "Portiere (POR)", "partite": {}},
-            "Riccardo": {"ruolo": "Riserva / Jolly", "partite": {}},
-            "Edoardo": {"ruolo": "Riserva / Jolly", "partite": {}}
+            "Lorenzo": {"ruolo": "Portiere (POR)", "partite": {}, "foto_path": None},
+            "Mattia": {"ruolo": "Difensore Centrale (DC)", "partite": {}, "foto_path": None},
+            "Filippo": {"ruolo": "Centrocampista (CC)", "partite": {}, "foto_path": None},
+            "Davide": {"ruolo": "Attaccante (ATT)", "partite": {}, "foto_path": None},
+            "Simone": {"ruolo": "Terzino (TS/TD)", "partite": {}, "foto_path": None},
+            "Federico": {"ruolo": "Centrocampista (CC)", "partite": {}, "foto_path": None},
+            "Alessandro": {"ruolo": "Attaccante (ATT)", "partite": {}, "foto_path": None},
+            "Luca": {"ruolo": "Difensore Centrale (DC)", "partite": {}, "foto_path": None},
+            "Marco": {"ruolo": "Esterno (EST)", "partite": {}, "foto_path": None},
+            "Giovanni": {"ruolo": "Centrocampista (CC)", "partite": {}, "foto_path": None},
+            "Tommaso": {"ruolo": "Attaccante (ATT)", "partite": {}, "foto_path": None},
+            "Pietro": {"ruolo": "Portiere (POR)", "partite": {}, "foto_path": None},
+            "Riccardo": {"ruolo": "Riserva / Jolly", "partite": {}, "foto_path": None},
+            "Edoardo": {"ruolo": "Riserva / Jolly", "partite": {}, "foto_path": None}
         }
     if "database_partite" not in st.session_state:
         st.session_state["database_partite"] = {
@@ -1198,7 +1221,25 @@ elif menu == "📈 Riepilogo Squadra":
     st.divider()
     st.subheader("📊 Riepilogo Stagionale Giocatore")
     giocatore_sel = st.selectbox("Seleziona Giocatore", list(db_giocatori.keys()) if db_giocatori else ["Nessun Giocatore"])
-    
+
+    foto_giocatore_sel = ottieni_foto_valida(giocatore_sel, db_giocatori)
+    ruolo_giocatore_sel = db_giocatori.get(giocatore_sel, {}).get("ruolo", "")
+
+    col_foto_scheda, col_info_scheda = st.columns([0.14, 0.86])
+    with col_foto_scheda:
+        if foto_giocatore_sel:
+            st.image(foto_giocatore_sel, width=76)
+        else:
+            st.markdown(
+                "<div style='width:76px;height:76px;border-radius:12px;display:flex;align-items:center;"
+                "justify-content:center;background:#1e2230;font-size:32px;'>🧑🏻</div>",
+                unsafe_allow_html=True
+            )
+    with col_info_scheda:
+        st.markdown(f"<h3 style='margin:4px 0 2px 0;'>{giocatore_sel}</h3>", unsafe_allow_html=True)
+        if ruolo_giocatore_sel:
+            st.caption(f"Ruolo in rosa: {ruolo_giocatore_sel}")
+
     storico_voti = []
     tot_minuti = 0
     presenze_titolare = 0
@@ -1414,7 +1455,8 @@ elif menu == "👤 Gestione Rosa":
                         nome = str(row["Nome"]).strip()
                         ruolo = str(row["Ruolo"]).strip()
                         if nome and nome.lower() != 'nan':
-                            nuova_rosa[nome] = {"ruolo": ruolo, "partite": {}}
+                            vecchia_foto = ottieni_foto_valida(nome, db_giocatori)
+                            nuova_rosa[nome] = {"ruolo": ruolo, "partite": {}, "foto_path": vecchia_foto}
                     st.session_state["database_giocatori"] = nuova_rosa
                     salva_dati_su_disco()
                     st.success(f"Rosa aggiornata con successo! Caricati {len(nuova_rosa)} giocatori.")
@@ -1432,7 +1474,7 @@ elif menu == "👤 Gestione Rosa":
         n_ruolo = st.selectbox("Ruolo", ["Portiere (POR)", "Difensore Centrale (DC)", "Terzino (TS/TD)", "Centrocampista (CC)", "Esterno (EST)", "Attaccante (ATT)"])
         if st.form_submit_button("Aggiungi alla Rosa") and n_nome:
             if n_nome not in db_giocatori:
-                db_giocatori[n_nome] = {"ruolo": n_ruolo, "partite": {}}
+                db_giocatori[n_nome] = {"ruolo": n_ruolo, "partite": {}, "foto_path": None}
                 salva_dati_su_disco()
                 st.success(f"Giocatore {n_nome} aggiunto e salvato con successo!")
                 st.rerun()
@@ -1443,15 +1485,77 @@ elif menu == "👤 Gestione Rosa":
         st.info("La rosa è attualmente vuota.")
     else:
         for nome, dati in list(db_giocatori.items()):
-            c1, c2 = st.columns([3, 1])
+            foto_att = ottieni_foto_valida(nome, db_giocatori)
+            chiave_box_foto = f"mostra_box_foto_{nome}"
+            if chiave_box_foto not in st.session_state:
+                st.session_state[chiave_box_foto] = False
+
+            c_img, c1, c_btn_foto, c_btn_del = st.columns([0.55, 2.55, 0.9, 0.9])
+            with c_img:
+                if foto_att:
+                    st.image(foto_att, width=46)
+                else:
+                    st.markdown(
+                        "<div style='width:46px;height:46px;border-radius:50%;display:flex;align-items:center;"
+                        "justify-content:center;background:#1e2230;font-size:20px;'>🧑🏻</div>",
+                        unsafe_allow_html=True
+                    )
             with c1:
-                st.markdown(f"<div class='scoutai-box' style='padding: 12px 16px; margin-bottom: 8px;'>📌 <strong>{nome}</strong> — <em>Ruolo:</em> {dati['ruolo']}</div>", unsafe_allow_html=True)
-            with c2:
-                if st.button("🗑️ Elimina", key=f"del_g_{nome}"):
+                stato_foto = " · 🖼️ Foto caricata" if foto_att else ""
+                st.markdown(
+                    f"<div class='scoutai-box' style='padding: 10px 14px; margin-bottom: 8px;'>"
+                    f"📌 <strong>{nome}</strong> — <em>Ruolo:</em> {dati['ruolo']}{stato_foto}</div>",
+                    unsafe_allow_html=True
+                )
+            with c_btn_foto:
+                if st.button("📷 Foto", key=f"btn_foto_{nome}", use_container_width=True):
+                    st.session_state[chiave_box_foto] = not st.session_state[chiave_box_foto]
+                    st.rerun()
+            with c_btn_del:
+                if st.button("🗑️ Elimina", key=f"del_g_{nome}", use_container_width=True):
+                    if foto_att and os.path.exists(foto_att):
+                        try:
+                            os.remove(foto_att)
+                        except OSError:
+                            pass
                     del db_giocatori[nome]
                     salva_dati_su_disco()
                     st.success(f"Rimosso {nome} e salvato.")
                     st.rerun()
+
+            if st.session_state.get(chiave_box_foto):
+                with st.container():
+                    f_up, f_save, f_rem = st.columns([2.6, 1.0, 1.0])
+                    with f_up:
+                        file_foto = st.file_uploader(
+                            f"Carica foto di {nome}",
+                            type=["png", "jpg", "jpeg", "webp"],
+                            key=f"up_foto_{nome}",
+                            label_visibility="collapsed"
+                        )
+                    with f_save:
+                        if st.button("💾 Salva Foto", key=f"save_foto_{nome}", use_container_width=True):
+                            if file_foto is not None:
+                                nuovo_path = salva_foto_giocatore(nome, file_foto)
+                                db_giocatori[nome]["foto_path"] = nuovo_path
+                                st.session_state[chiave_box_foto] = False
+                                salva_dati_su_disco()
+                                st.success(f"Foto salvata per {nome}!")
+                                st.rerun()
+                            else:
+                                st.warning("Seleziona prima un'immagine.")
+                    with f_rem:
+                        if st.button("❌ Rimuovi Foto", key=f"rem_foto_{nome}", use_container_width=True):
+                            if foto_att and os.path.exists(foto_att):
+                                try:
+                                    os.remove(foto_att)
+                                except OSError:
+                                    pass
+                            db_giocatori[nome]["foto_path"] = None
+                            st.session_state[chiave_box_foto] = False
+                            salva_dati_su_disco()
+                            st.info(f"Foto rimossa per {nome}.")
+                            st.rerun()
 
 # =====================================================================
 # 6. EDITOR GRAFICA & SETTINGS
