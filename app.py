@@ -468,7 +468,7 @@ st.markdown(f"""
         background-color: {tema['bg_card']};
         border: 2px dashed {glow_border_rgba};
         border-radius: {radius_px}px;
-        height: 320px;
+        height: 260px;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -489,6 +489,22 @@ st.markdown(f"""
         display: flex;
         align-items: center;
         gap: 12px;
+    }}
+
+    @media (max-width: 768px) {{
+        .block-container {{
+            padding: 1rem 0.9rem !important;
+        }}
+        .scoutai-box {{
+            padding: 14px !important;
+        }}
+        [data-testid="stMetric"] {{
+            padding: 12px !important;
+        }}
+        .stButton > button, .stDownloadButton > button {{
+            min-height: 44px !important;
+            padding: 0.65rem 1rem !important;
+        }}
     }}
     {fullscreen_css}
 </style>
@@ -1054,55 +1070,94 @@ elif menu == "🎥 Video Analisi":
     if "youtube_link" not in p_info:
         p_info["youtube_link"] = ""
 
-    st.divider()
+    # 1. Riepilogo dati partita compatto (ottimizzato desktop + mobile)
+    data_p = p_info.get("data", "N.D.")
+    ris_p = p_info.get("risultato", "N.D.")
+    luogo_p = p_info.get("casa_trasferta", "Casa")
+    mod_p = p_info.get("modulo", "N.D.")
 
-    col_info1, col_info2, col_info3, col_info4 = st.columns(4)
-    col_info1.metric("Data Partita", p_info.get("data", "N.D."))
-    col_info2.metric("Risultato", p_info.get("risultato", "N.D."))
-    col_info3.metric("Luogo", p_info.get("casa_trasferta", "Casa"))
-    col_info4.metric("Modulo", p_info.get("modulo", "N.D."))
+    st.markdown(f"""
+    <div style="
+        background-color: {tema['bg_card']};
+        border: 1px solid {glow_border_rgba};
+        border-radius: {max(8, radius_px - 2)}px;
+        padding: 10px 16px;
+        margin: 10px 0 14px 0;
+        box-shadow: {box_shadow_soft};
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+    ">
+        <div style="font-weight: 700; font-size: 14px; color: {accent_hex};">
+            📌 {partita_sel}
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 12px; font-size: 13px; color: {tema['text_color']};">
+            <span>📅 <strong>Data:</strong> {data_p}</span>
+            <span>⚽ <strong>Risultato:</strong> {ris_p}</span>
+            <span>🏟️ <strong>Luogo:</strong> {luogo_p}</span>
+            <span>📐 <strong>Modulo:</strong> {mod_p}</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    st.divider()
-
-    col_input_l, col_video_r = st.columns([1.2, 1.8])
-
-    with col_input_l:
-        st.subheader("🔗 Configurazione Link")
-        link_inserito = st.text_input("Inserisci Link YouTube", value=p_info.get("youtube_link", ""), placeholder="https://www.youtube.com/watch?v=...")
-        
-        if st.button("▶️ Play Video", use_container_width=True):
-            p_info["youtube_link"] = link_inserito
+    # 2. Link YouTube e pulsante "Carica Video" subito sotto
+    col_link, col_btn = st.columns([3.5, 1.2])
+    with col_link:
+        link_inserito = st.text_input(
+            "Link YouTube Partita",
+            value=p_info.get("youtube_link", ""),
+            placeholder="https://www.youtube.com/watch?v=...",
+            label_visibility="collapsed",
+            key=f"yt_input_{partita_sel}"
+        )
+    with col_btn:
+        if st.button("📥 Carica Video", use_container_width=True, key=f"btn_carica_video_{partita_sel}"):
+            p_info["youtube_link"] = link_inserito.strip()
             st.session_state["partita_attiva"] = partita_sel
             salva_dati_su_disco()
-            st.success("Link aggiornato con successo!")
+            st.success("Video caricato e link salvato!")
             st.rerun()
 
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.info("💡 **Istruzioni:** Incolla il link del video di YouTube e clicca su **Play Video** per caricarlo nel player a destra.")
+    st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
-    with col_video_r:
-        st.subheader("📺 Main Frame Video")
-        link_corrente = p_info.get("youtube_link", "")
-        yt_id = estrai_youtube_id(link_corrente)
+    # 3. Main Frame video centrato a tutta larghezza dello schermo
+    link_corrente = p_info.get("youtube_link", "")
+    yt_id = estrai_youtube_id(link_corrente)
 
-        if yt_id:
-            embed_url = f"https://www.youtube.com/embed/{yt_id}"
-            st.markdown(f"""
-                <div style="position: relative; width: 100%; height: 0; padding-bottom: 56.25%;">
-                    <iframe src="{embed_url}" 
-                            style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: {radius_px}px; border: 1px solid {glow_border_rgba}; box-shadow: {box_shadow_glow};" 
-                            allowfullscreen>
+    if yt_id:
+        embed_url = f"https://www.youtube.com/embed/{yt_id}"
+        st.markdown(f"""
+            <div style="
+                width: 100%;
+                max-width: 100%;
+                margin: 0 auto;
+                border-radius: {radius_px}px;
+                overflow: hidden;
+                border: 1px solid {glow_border_rgba};
+                box-shadow: {box_shadow_glow};
+                background-color: {tema['bg_card']};
+            ">
+                <div style="position: relative; width: 100%; padding-bottom: 56.25%; height: 0;">
+                    <iframe
+                        src="{embed_url}"
+                        title="Video Analisi - {partita_sel}"
+                        style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0;"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowfullscreen>
                     </iframe>
                 </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.markdown("""
-                <div class="scoutai-video-empty">
-                    <span style="font-size: 40px; margin-bottom: 10px;">📺</span>
-                    <p style="color: #a0aec0; margin: 0; font-size: 16px;">Nessun video caricato o link YouTube non valido.</p>
-                    <p style="color: #718096; margin-top: 5px; font-size: 13px;">Inserisci un link valido nel pannello a sinistra e premi Play.</p>
-                </div>
-            """, unsafe_allow_html=True)
+            </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown(f"""
+            <div class="scoutai-video-empty" style="width: 100%; max-width: 100%; height: 260px;">
+                <span style="font-size: 36px; margin-bottom: 8px;">📺</span>
+                <p style="color: #a0aec0; margin: 0; font-size: 15px;">Nessun video caricato o link YouTube non valido.</p>
+                <p style="color: #718096; margin-top: 6px; font-size: 13px;">Incolla un link YouTube qui sopra e clicca su <strong>Carica Video</strong>.</p>
+            </div>
+        """, unsafe_allow_html=True)
 
 # =====================================================================
 # 4. RIEPILOGO SQUADRA & GIOCATORI
