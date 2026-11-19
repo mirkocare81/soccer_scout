@@ -587,7 +587,7 @@ if not st.session_state["home_entered"]:
         [data-testid="stSidebar"] {{ display: none !important; }}
         header {{ visibility: hidden !important; }}
         .scoutai-home-banner {{
-            max-width: 1060px;
+            max-width: 1260px;
             margin: 0.5rem auto 0.75rem auto;
             padding: 14px 18px;
             text-align: center;
