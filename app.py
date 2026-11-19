@@ -126,28 +126,52 @@ def valori_base_giocatore(nome_g, is_portiere, is_riserva, db_giocatori):
     }
 
 def ripristina_parametri_partita(partita_sel, p_dati, db_giocatori):
-    """Riporta ai valori base tutti i parametri della partita selezionata e pulisce i widget in session_state."""
+    """Riporta ai valori base tutti i parametri della partita e aggiorna subito i widget in session_state."""
     p_dati["dati_prestazione"] = {}
-    for k_str, nome_g in p_dati.get("formazione", {}).items():
+    formazione = p_dati.get("formazione", {})
+
+    for k_str, nome_g in formazione.items():
         if not nome_g:
             continue
+
         num_int = int(k_str) if str(k_str).isdigit() else 0
         is_portiere = str(k_str) in ["1", "12"]
         is_riserva = num_int >= 12
-        p_dati["dati_prestazione"][nome_g] = valori_base_giocatore(
+
+        base = valori_base_giocatore(
             nome_g, is_portiere=is_portiere, is_riserva=is_riserva, db_giocatori=db_giocatori
         )
+        p_dati["dati_prestazione"][nome_g] = base.copy()
 
-    prefissi = (
-        f"min_{partita_sel}_", f"par_{partita_sel}_", f"usc_{partita_sel}_", f"gol_sub_{partita_sel}_",
-        f"ruolo_{partita_sel}_", f"due_{partita_sel}_", f"pas_{partita_sel}_", f"per_{partita_sel}_",
-        f"tir_{partita_sel}_", f"gol_{partita_sel}_",
-        f"min_res_{partita_sel}_", f"par_res_{partita_sel}_", f"usc_res_{partita_sel}_", f"gol_sub_res_{partita_sel}_",
-        f"ruolo_res_{partita_sel}_", f"due_res_{partita_sel}_", f"pas_res_{partita_sel}_", f"per_res_{partita_sel}_",
-        f"tir_res_{partita_sel}_", f"gol_res_{partita_sel}_",
-    )
-    for k_widget in [k for k in st.session_state.keys() if k.startswith(prefissi)]:
-        del st.session_state[k_widget]
+        # Aggiorna subito le chiavi dei widget corrispondenti a quello slot (titolare o riserva)
+        if not is_riserva:
+            if is_portiere:
+                st.session_state[f"min_{partita_sel}_{num_int}"] = int(base["minuti"])
+                st.session_state[f"par_{partita_sel}_{num_int}"] = int(base["parate"])
+                st.session_state[f"usc_{partita_sel}_{num_int}"] = str(base["uscite"])
+                st.session_state[f"gol_sub_{partita_sel}_{num_int}"] = str(base["gol_subiti_resp"])
+            else:
+                st.session_state[f"ruolo_{partita_sel}_{num_int}"] = str(base["ruolo_campo"])
+                st.session_state[f"min_{partita_sel}_{num_int}"] = int(base["minuti"])
+                st.session_state[f"due_{partita_sel}_{num_int}"] = str(base["duelli"])
+                st.session_state[f"pas_{partita_sel}_{num_int}"] = str(base["efficacia_passaggi"])
+                st.session_state[f"per_{partita_sel}_{num_int}"] = int(base["perse"])
+                st.session_state[f"tir_{partita_sel}_{num_int}"] = str(base["tiri"])
+                st.session_state[f"gol_{partita_sel}_{num_int}"] = int(base["gol_fatti"])
+        else:
+            if is_portiere:
+                st.session_state[f"min_res_{partita_sel}_{num_int}"] = int(base["minuti"])
+                st.session_state[f"par_res_{partita_sel}_{num_int}"] = int(base["parate"])
+                st.session_state[f"usc_res_{partita_sel}_{num_int}"] = str(base["uscite"])
+                st.session_state[f"gol_sub_res_{partita_sel}_{num_int}"] = str(base["gol_subiti_resp"])
+            else:
+                st.session_state[f"ruolo_res_{partita_sel}_{num_int}"] = str(base["ruolo_campo"])
+                st.session_state[f"min_res_{partita_sel}_{num_int}"] = int(base["minuti"])
+                st.session_state[f"due_res_{partita_sel}_{num_int}"] = str(base["duelli"])
+                st.session_state[f"pas_res_{partita_sel}_{num_int}"] = str(base["efficacia_passaggi"])
+                st.session_state[f"per_res_{partita_sel}_{num_int}"] = int(base["perse"])
+                st.session_state[f"tir_res_{partita_sel}_{num_int}"] = str(base["tiri"])
+                st.session_state[f"gol_res_{partita_sel}_{num_int}"] = int(base["gol_fatti"])
 
     st.session_state["partita_attiva"] = partita_sel
     salva_dati_su_disco()
