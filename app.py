@@ -2163,6 +2163,45 @@ elif menu == "📈 Riepilogo Squadra":
 elif menu == "📊 Grafici & Analisi Visiva":
     st.title("📊 Grafici & Analisi Visiva")
 
+    glow_chart_px = max(4, min(28, int(glow_larghezza_px * 0.75)))
+    glow_chart_color = hex_to_rgba(accent_hex, max(0.28, min(0.75, glow_intensita_alfa * 1.35)))
+
+    st.markdown(f"""
+    <style>
+        .scoutai-chart-glow {{
+            background-color: {tema['bg_card']};
+            border: 1px solid {glow_border_rgba};
+            border-radius: {radius_px}px;
+            padding: 14px 16px 8px 16px;
+            box-shadow: {box_shadow_glow};
+            margin-bottom: 12px;
+        }}
+        .scoutai-chart-glow [data-testid="stVegaLiteChart"] canvas,
+        .scoutai-chart-glow [data-testid="stVegaLiteChart"] svg {{
+            filter: drop-shadow(0 0 {glow_chart_px}px {glow_chart_color});
+        }}
+    </style>
+    """, unsafe_allow_html=True)
+
+    def stile_chart_scoutai(chart, altezza=280):
+        return (
+            chart.properties(height=altezza, background="transparent")
+            .configure_view(stroke=None, fill="transparent")
+            .configure_axis(
+                labelColor=tema["text_color"],
+                titleColor="#cbd5e1",
+                gridColor=hex_to_rgba(tema["text_color"], 0.10),
+                domainColor=hex_to_rgba(tema["text_color"], 0.25),
+                tickColor=hex_to_rgba(tema["text_color"], 0.25),
+            )
+            .configure_legend(
+                labelColor=tema["text_color"],
+                titleColor="#cbd5e1",
+                symbolSize=120,
+                symbolStrokeWidth=1.5,
+            )
+        )
+
     if not db_partite:
         st.warning("⚠️ Nessuna partita disponibile per generare i grafici.")
         st.stop()
@@ -2210,15 +2249,23 @@ elif menu == "📊 Grafici & Analisi Visiva":
         df_sq = pd.DataFrame(righe_squadra_graf)
         chart_sq = (
             alt.Chart(df_sq)
-            .mark_bar(cornerRadiusTopLeft=6, cornerRadiusTopRight=6, color=accent_hex)
+            .mark_bar(
+                cornerRadiusTopLeft=6,
+                cornerRadiusTopRight=6,
+                color=accent_hex,
+                stroke=tema["text_color"],
+                strokeWidth=0.6,
+                strokeOpacity=0.35
+            )
             .encode(
                 x=alt.X("Partita:N", sort=alt.EncodingSortField(field="Ordine", order="ascending"), title="Partita"),
                 y=alt.Y("Voto Medio:Q", scale=alt.Scale(domain=[0, 10]), title="Voto Medio Squadra"),
                 tooltip=["Partita", "Data", "Luogo", "Voto Medio"]
             )
-            .properties(height=300)
         )
-        st.altair_chart(chart_sq, use_container_width=True)
+        st.markdown("<div class='scoutai-chart-glow'>", unsafe_allow_html=True)
+        st.altair_chart(stile_chart_scoutai(chart_sq, altezza=300), use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
     else:
         st.info("Nessun voto disponibile per il filtro selezionato.")
 
@@ -2289,9 +2336,26 @@ elif menu == "📊 Grafici & Analisi Visiva":
             media_g = round(df_vg["Voto"].mean(), 2)
             df_vg["Media Stagionale"] = media_g
 
+            area_voto = (
+                alt.Chart(df_vg)
+                .mark_area(
+                    color=alt.Gradient(
+                        gradient="linear",
+                        stops=[
+                            alt.GradientStop(color=hex_to_rgba(accent_hex, 0.32), offset=0),
+                            alt.GradientStop(color=hex_to_rgba(accent_hex, 0.02), offset=1),
+                        ],
+                        x1=0, x2=0, y1=0, y2=1
+                    )
+                )
+                .encode(
+                    x=alt.X("Partita:N", sort=alt.EncodingSortField(field="Ordine", order="ascending"), title="Partita"),
+                    y=alt.Y("Voto:Q", scale=alt.Scale(domain=[1, 10]), title="Voto")
+                )
+            )
             linea_voto = (
                 alt.Chart(df_vg)
-                .mark_line(point=True, strokeWidth=3, color=accent_hex)
+                .mark_line(point=alt.OverlayMarkDef(filled=True, size=75, color=accent_hex, stroke="#ffffff", strokeWidth=1.5), strokeWidth=3.5, color=accent_hex)
                 .encode(
                     x=alt.X("Partita:N", sort=alt.EncodingSortField(field="Ordine", order="ascending"), title="Partita"),
                     y=alt.Y("Voto:Q", scale=alt.Scale(domain=[1, 10]), title="Voto"),
@@ -2300,10 +2364,12 @@ elif menu == "📊 Grafici & Analisi Visiva":
             )
             linea_media = (
                 alt.Chart(df_vg)
-                .mark_rule(strokeDash=[5, 5], color="#94a3b8")
+                .mark_rule(strokeDash=[5, 5], strokeWidth=1.8, color="#e2e8f0")
                 .encode(y="Media Stagionale:Q")
             )
-            st.altair_chart((linea_voto + linea_media).properties(height=280), use_container_width=True)
+            st.markdown("<div class='scoutai-chart-glow'>", unsafe_allow_html=True)
+            st.altair_chart(stile_chart_scoutai(area_voto + linea_voto + linea_media, altezza=280), use_container_width=True)
+            st.markdown("</div>", unsafe_allow_html=True)
         else:
             st.info("Nessuna partita votata (con minuti > 0) per questo giocatore.")
 
@@ -2315,7 +2381,32 @@ elif menu == "📊 Grafici & Analisi Visiva":
                     "Evento": ["Parate Decisive", "Gol Subiti", "Errori Gravi"],
                     "Totale": [tot_parate_g, tot_gol_sub_g, tot_errori_g]
                 })
-                st.bar_chart(df_param.set_index("Evento"), height=280)
+                chart_ev = (
+                    alt.Chart(df_param)
+                    .mark_bar(
+                        cornerRadiusTopLeft=6,
+                        cornerRadiusTopRight=6,
+                        stroke="#ffffff",
+                        strokeWidth=1.2,
+                        strokeOpacity=0.65
+                    )
+                    .encode(
+                        x=alt.X("Evento:N", sort=["Parate Decisive", "Gol Subiti", "Errori Gravi"], title="Evento"),
+                        y=alt.Y("Totale:Q", title="Totale"),
+                        color=alt.Color(
+                            "Evento:N",
+                            scale=alt.Scale(
+                                domain=["Parate Decisive", "Gol Subiti", "Errori Gravi"],
+                                range=[accent_hex, "#38bdf8", "#f97316"]
+                            ),
+                            legend=alt.Legend(title="Tipo Evento")
+                        ),
+                        tooltip=["Evento", "Totale"]
+                    )
+                )
+                st.markdown("<div class='scoutai-chart-glow'>", unsafe_allow_html=True)
+                st.altair_chart(stile_chart_scoutai(chart_ev, altezza=280), use_container_width=True)
+                st.markdown("</div>", unsafe_allow_html=True)
             else:
                 st.info("Nessun evento registrato per questo portiere.")
         else:
@@ -2324,7 +2415,32 @@ elif menu == "📊 Grafici & Analisi Visiva":
                     "Evento": ["Gol Segnati", "Assist", "Errori Gravi"],
                     "Totale": [tot_gol_g, tot_assist_g, tot_errori_g]
                 })
-                st.bar_chart(df_param.set_index("Evento"), height=280)
+                chart_ev = (
+                    alt.Chart(df_param)
+                    .mark_bar(
+                        cornerRadiusTopLeft=6,
+                        cornerRadiusTopRight=6,
+                        stroke="#ffffff",
+                        strokeWidth=1.2,
+                        strokeOpacity=0.65
+                    )
+                    .encode(
+                        x=alt.X("Evento:N", sort=["Gol Segnati", "Assist", "Errori Gravi"], title="Evento"),
+                        y=alt.Y("Totale:Q", title="Totale"),
+                        color=alt.Color(
+                            "Evento:N",
+                            scale=alt.Scale(
+                                domain=["Gol Segnati", "Assist", "Errori Gravi"],
+                                range=[accent_hex, "#38bdf8", "#f97316"]
+                            ),
+                            legend=alt.Legend(title="Tipo Evento")
+                        ),
+                        tooltip=["Evento", "Totale"]
+                    )
+                )
+                st.markdown("<div class='scoutai-chart-glow'>", unsafe_allow_html=True)
+                st.altair_chart(stile_chart_scoutai(chart_ev, altezza=280), use_container_width=True)
+                st.markdown("</div>", unsafe_allow_html=True)
             else:
                 st.info("Nessun evento chiave (gol, assist o errori) registrato.")
 
@@ -2355,13 +2471,69 @@ elif menu == "📊 Grafici & Analisi Visiva":
     if righe_rosa_graf:
         df_rosa_g = pd.DataFrame(righe_rosa_graf).sort_values("Minuti Giocati", ascending=False)
         c_r1, c_r2 = st.columns(2)
+
         with c_r1:
             st.markdown("**Minuti giocati in stagione**")
-            st.bar_chart(df_rosa_g.set_index("Giocatore")[["Minuti Giocati"]], height=280)
+            chart_min = (
+                alt.Chart(df_rosa_g)
+                .mark_bar(
+                    cornerRadiusTopLeft=5,
+                    cornerRadiusTopRight=5,
+                    color=accent_hex,
+                    stroke="#ffffff",
+                    strokeWidth=0.9,
+                    strokeOpacity=0.55
+                )
+                .encode(
+                    x=alt.X("Giocatore:N", sort="-y", title="Giocatore"),
+                    y=alt.Y("Minuti Giocati:Q", title="Minuti"),
+                    tooltip=["Giocatore", "Minuti Giocati"]
+                )
+            )
+            st.markdown("<div class='scoutai-chart-glow'>", unsafe_allow_html=True)
+            st.altair_chart(stile_chart_scoutai(chart_min, altezza=280), use_container_width=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+
         with c_r2:
             st.markdown("**Gol e Assist in stagione**")
-            st.bar_chart(df_rosa_g.sort_values(["Gol", "Assist"], ascending=False).set_index("Giocatore")[["Gol", "Assist"]], height=280)
-
+            ordine_ga = (
+                df_rosa_g.assign(_tot_ga=df_rosa_g["Gol"] + df_rosa_g["Assist"])
+                .sort_values(["_tot_ga", "Gol"], ascending=False)["Giocatore"]
+                .tolist()
+            )
+            df_ga_long = df_rosa_g.melt(
+                id_vars=["Giocatore"],
+                value_vars=["Gol", "Assist"],
+                var_name="Voce",
+                value_name="Conteggio"
+            )
+            chart_ga = (
+                alt.Chart(df_ga_long)
+                .mark_bar(
+                    cornerRadiusTopLeft=5,
+                    cornerRadiusTopRight=5,
+                    stroke="#ffffff",
+                    strokeWidth=1.1,
+                    strokeOpacity=0.65
+                )
+                .encode(
+                    x=alt.X("Giocatore:N", sort=ordine_ga, title="Giocatore"),
+                    y=alt.Y("Conteggio:Q", title="Totale"),
+                    xOffset=alt.XOffset("Voce:N", sort=["Gol", "Assist"]),
+                    color=alt.Color(
+                        "Voce:N",
+                        scale=alt.Scale(
+                            domain=["Gol", "Assist"],
+                            range=[accent_hex, "#38bdf8"]
+                        ),
+                        legend=alt.Legend(title="Voce")
+                    ),
+                    tooltip=["Giocatore", "Voce", "Conteggio"]
+                )
+            )
+            st.markdown("<div class='scoutai-chart-glow'>", unsafe_allow_html=True)
+            st.altair_chart(stile_chart_scoutai(chart_ga, altezza=280), use_container_width=True)
+            st.markdown("</div>", unsafe_allow_html=True)
 # =====================================================================
 # 6. GESTIONE ROSA
 # =====================================================================
