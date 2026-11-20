@@ -1468,29 +1468,38 @@ elif menu == "⚡ Inserimento Parametri & Voti":
             p_g = p_dati.get("dati_prestazione", {}).get(nome, {})
             min_g = int(p_g.get("minuti", 0)) if p_g else 0
             voto_g = calcola_voto(p_g, is_portiere) if (p_g and min_g > 0) else None
+
             if is_portiere:
                 dp = estrai_dati_portiere_compat(p_g)
                 ruolo_str = "POR (Porta)"
-                dettaglio = (
-                    f"Sicurezza: {dp['sicurezza_portiere']} | Parate dec.: {dp['parate_decisive']} | "
-                    f"Gol sub.: {dp['gol_subiti']} | Errori: {dp['errori_gravi']}"
-                )
+                righe_lettura.append({
+                    "N°": str(n),
+                    "Giocatore": nome,
+                    "Ruolo / Area": ruolo_str,
+                    "Minuti": f"{min_g}'",
+                    "Sicurezza / Impatto": dp["sicurezza_portiere"],
+                    "Parate / Palla": f"{dp['parate_decisive']} parate dec.",
+                    "Gol / Gol Sub.": f"{dp['gol_subiti']} subiti",
+                    "Assist": "-",
+                    "Errori Gravi": dp["errori_gravi"],
+                    "Voto": f"{voto_g} / 10" if voto_g is not None else "N.D."
+                })
             else:
                 ruolo_c = p_g.get("ruolo_campo") or ruolo_default_da_rosa(db_giocatori.get(nome, {}).get("ruolo", ""))
                 ruolo_str = f"{ruolo_c} ({get_etichetta_area(ruolo_c)})"
                 dm = estrai_dati_movimento_compat(p_g)
-                dettaglio = (
-                    f"Impatto: {dm['impatto_partita']} | Palla/Duelli: {dm['gestione_palla']} | "
-                    f"Gol: {dm['gol_fatti']} | Assist: {dm['assist']} | Errori: {dm['errori_gravi']}"
-                )
-            righe_lettura.append({
-                "N°": str(n),
-                "Giocatore": nome,
-                "Ruolo / Area": ruolo_str,
-                "Minuti": f"{min_g}'",
-                "Valutazione": dettaglio,
-                "Voto": f"{voto_g} / 10" if voto_g is not None else "N.D."
-            })
+                righe_lettura.append({
+                    "N°": str(n),
+                    "Giocatore": nome,
+                    "Ruolo / Area": ruolo_str,
+                    "Minuti": f"{min_g}'",
+                    "Sicurezza / Impatto": dm["impatto_partita"],
+                    "Parate / Palla": dm["gestione_palla"],
+                    "Gol / Gol Sub.": dm["gol_fatti"],
+                    "Assist": dm["assist"],
+                    "Errori Gravi": dm["errori_gravi"],
+                    "Voto": f"{voto_g} / 10" if voto_g is not None else "N.D."
+                })
         if righe_lettura:
             st.table(pd.DataFrame(righe_lettura))
         else:
@@ -2534,6 +2543,7 @@ elif menu == "📊 Grafici & Analisi Visiva":
             st.markdown("<div class='scoutai-chart-glow'>", unsafe_allow_html=True)
             st.altair_chart(stile_chart_scoutai(chart_ga, altezza=280), use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
+
 # =====================================================================
 # 6. GESTIONE ROSA
 # =====================================================================
