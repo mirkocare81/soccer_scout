@@ -2125,7 +2125,7 @@ elif menu == "📈 Riepilogo Squadra":
 
     c1, c2, c3 = st.columns(3)
     with c1:
-        render_metric_con_icona("Partite Votate", str(len(storico_voti)), "")
+        st.metric("Partite Votate", len(storico_voti))
     with c2:
         render_metric_con_icona(
             "Media Voto Stagionale",
