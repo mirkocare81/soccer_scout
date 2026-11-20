@@ -134,6 +134,14 @@ def ottieni_opzioni_accesso_home(db_giocatori):
             opzioni.append(u_clean)
     return opzioni if opzioni else UTENTI_EXTRA_HOME.copy()
 
+def ottieni_profilo_home_attivo():
+    """Restituisce il profilo selezionato all'accesso nella Home se disponibile."""
+    return (
+        st.session_state.get("utente_attivo")
+        or st.session_state.get("ultimo_utente_home")
+        or st.query_params.get("utente", "")
+    )
+
 def sincronizza_client_localstorage(utente_da_salvare=None):
     """Salva su localStorage del client l'utente scelto oppure lo legge e aggiorna ?utente= al primo caricamento."""
     if utente_da_salvare:
@@ -1965,7 +1973,16 @@ elif menu == "📈 Riepilogo Squadra":
 
     st.divider()
     st.subheader("📊 Riepilogo Stagionale Giocatore")
-    giocatore_sel = st.selectbox("Seleziona Giocatore", list(db_giocatori.keys()) if db_giocatori else ["Nessun Giocatore"])
+    nomi_rosa_riepilogo = list(db_giocatori.keys()) if db_giocatori else ["Nessun Giocatore"]
+    profilo_home = ottieni_profilo_home_attivo()
+    idx_gioc_default = nomi_rosa_riepilogo.index(profilo_home) if profilo_home in nomi_rosa_riepilogo else 0
+
+    giocatore_sel = st.selectbox(
+        "Seleziona Giocatore",
+        nomi_rosa_riepilogo,
+        index=idx_gioc_default,
+        key="sel_giocatore_riepilogo"
+    )
 
     foto_giocatore_sel = ottieni_foto_valida(giocatore_sel, db_giocatori)
     ruolo_giocatore_sel = db_giocatori.get(giocatore_sel, {}).get("ruolo", "")
@@ -2213,7 +2230,15 @@ elif menu == "📊 Grafici & Analisi Visiva":
         st.info("Aggiungi almeno un giocatore in Gestione Rosa per visualizzare i grafici individuali.")
         st.stop()
 
-    gioc_graf = st.selectbox("Seleziona Giocatore", nomi_rosa, key="sel_giocatore_grafici")
+    profilo_home_graf = ottieni_profilo_home_attivo()
+    idx_graf_default = nomi_rosa.index(profilo_home_graf) if profilo_home_graf in nomi_rosa else 0
+
+    gioc_graf = st.selectbox(
+        "Seleziona Giocatore",
+        nomi_rosa,
+        index=idx_graf_default,
+        key="sel_giocatore_grafici"
+    )
 
     righe_voti_gioc = []
     tot_gol_g = 0
