@@ -407,19 +407,67 @@ def ottieni_foto_valida(nome_giocatore, db_giocatori):
         return foto_path
     return None
 
+def costruisci_payload_database():
+    """Restituisce il dizionario completo dello stato/database salvabile su disco o in backup JSON."""
+    return {
+        "giocatori": st.session_state.get("database_giocatori", {}),
+        "partite": st.session_state.get("database_partite", {}),
+        "partita_attiva": st.session_state.get("partita_attiva"),
+        "ui_theme": st.session_state.get("ui_theme", {}),
+        "fullscreen_mode": st.session_state.get("fullscreen_mode", False),
+        "auth_config": st.session_state.get("auth_config", {}),
+        "statistiche_accessi": st.session_state.get("statistiche_accessi", {}),
+        "ultimo_utente_home": st.session_state.get("ultimo_utente_home", ""),
+    }
+
+def applica_payload_database(payload):
+    """Applica un dizionario di backup/database validato allo session_state e lo salva su disco."""
+    if not isinstance(payload, dict):
+        return False, "Il file JSON non contiene un oggetto valido."
+
+    giocatori_imp = payload.get("giocatori")
+    partite_imp = payload.get("partite")
+    if not isinstance(giocatori_imp, dict) or not isinstance(partite_imp, dict):
+        return False, "Il JSON deve contenere almeno i campi 'giocatori' e 'partite' (oggetti)."
+
+    st.session_state["database_giocatori"] = giocatori_imp
+    st.session_state["database_partite"] = partite_imp
+    st.session_state["partita_attiva"] = payload.get("partita_attiva")
+
+    if isinstance(payload.get("ui_theme"), dict) and payload["ui_theme"]:
+        merged_theme = PRESET_TEMI["Emerald Dark (Default)"].copy()
+        merged_theme.update(payload["ui_theme"])
+        st.session_state["ui_theme"] = merged_theme
+
+    if "fullscreen_mode" in payload:
+        st.session_state["fullscreen_mode"] = bool(payload.get("fullscreen_mode", False))
+
+    if isinstance(payload.get("auth_config"), dict) and payload["auth_config"]:
+        cfg_imp = payload["auth_config"].copy()
+        cfg_imp.setdefault("admin_pin_hash", _hash_pin("1234"))
+        cfg_imp.setdefault("read_only_boys", True)
+        cfg_imp.setdefault("sezioni_ragazzi", [
+            "🎥 Video Analisi",
+            "📈 Riepilogo Squadra",
+            "📊 Grafici & Analisi Visiva",
+        ])
+        cfg_imp.setdefault("schede_attive", TUTTE_LE_SCHEDE_APP.copy())
+        cfg_imp.setdefault("applica_nascoste_ad_admin", False)
+        st.session_state["auth_config"] = cfg_imp
+
+    if isinstance(payload.get("statistiche_accessi"), dict):
+        st.session_state["statistiche_accessi"] = payload["statistiche_accessi"]
+
+    if "ultimo_utente_home" in payload:
+        st.session_state["ultimo_utente_home"] = str(payload.get("ultimo_utente_home") or "")
+
+    salva_dati_su_disco()
+    return True, f"Backup importato: {len(giocatori_imp)} giocatori e {len(partite_imp)} partite ripristinati."
+
 def salva_dati_su_disco():
     """Salvataggio automatico istantaneo su file JSON"""
     try:
-        data_to_save = {
-            "giocatori": st.session_state.get("database_giocatori", {}),
-            "partite": st.session_state.get("database_partite", {}),
-            "partita_attiva": st.session_state.get("partita_attiva"),
-            "ui_theme": st.session_state.get("ui_theme", {}),
-            "fullscreen_mode": st.session_state.get("fullscreen_mode", False),
-            "auth_config": st.session_state.get("auth_config", {}),
-            "statistiche_accessi": st.session_state.get("statistiche_accessi", {}),
-            "ultimo_utente_home": st.session_state.get("ultimo_utente_home", ""),
-        }
+        data_to_save = costruisci_payload_database()
         with open(DB_FILE, "w", encoding="utf-8") as f:
             json.dump(data_to_save, f, ensure_ascii=False, indent=4)
     except Exception as e:
@@ -942,7 +990,6 @@ def calcola_voto(p, is_portiere=False):
         if minuti_giocati <= 0:
             return None
 
-        # Fattore minutaggio morbido (chi gioca almeno 55' prende peso pieno sui giudizi)
         fattore_tempo = min(1.0, max(0.35, minuti_giocati / 60.0))
         rating = 6.0
 
@@ -2510,7 +2557,11 @@ elif menu == "🛡️ Pannello Admin":
         st.warning("Accesso riservato all'Admin. Effettua il login dalla sidebar.")
         st.stop()
 
-    st.title("🛡️ Pannello Admin — Controllo Accessi & Schede")
+    st.title("🛡️ Pannello Admin — Controllo Accessi, Schede & Backup")
+
+    if st.session_state.get("admin_notice"):
+        st.success(st.session_state["admin_notice"])
+        st.session_state["admin_notice"] = None
 
     with st.form("form_admin_accessi"):
         st.subheader("1. Regole Accesso Ragazzi")
@@ -2557,6 +2608,52 @@ elif menu == "🛡️ Pannello Admin":
         salva_dati_su_disco()
         st.success("Visibilità delle schede salvata su disco!")
         st.rerun()
+
+    st.divider()
+    st.subheader("💾 Backup & Ripristino Completo (JSON)")
+    st.caption(
+        "Esporta un file `.json` con tutta la rosa, le partite, le valutazioni, i link video, il tema e gli accessi. "
+        "Puoi importarlo in qualsiasi momento per ripristinare i dati."
+    )
+
+    col_exp_json, col_imp_json = st.columns(2)
+    with col_exp_json:
+        json_backup_str = json.dumps(costruisci_payload_database(), ensure_ascii=False, indent=4).encode("utf-8")
+        nome_file_backup = f"scoutai_backup_{datetime.now().strftime('%Y%m%d_%H%M')}.json"
+        st.download_button(
+            "📤 Esporta Backup Completo JSON",
+            data=json_backup_str,
+            file_name=nome_file_backup,
+            mime="application/json",
+            use_container_width=True,
+            key="btn_export_backup_json"
+        )
+
+    with col_imp_json:
+        uploaded_backup_json = st.file_uploader(
+            "Seleziona file di backup JSON",
+            type=["json"],
+            key="uploader_backup_json",
+            label_visibility="collapsed"
+        )
+        if st.button("📥 Importa Backup JSON", use_container_width=True, key="btn_import_backup_json"):
+            if uploaded_backup_json is None:
+                st.warning("Seleziona prima un file `.json` di backup.")
+            else:
+                try:
+                    uploaded_backup_json.seek(0)
+                    raw_bytes = uploaded_backup_json.read()
+                    parsed_payload = json.loads(raw_bytes.decode("utf-8"))
+                    ok, msg = applica_payload_database(parsed_payload)
+                    if ok:
+                        st.session_state["admin_notice"] = msg
+                        st.rerun()
+                    else:
+                        st.error(msg)
+                except json.JSONDecodeError:
+                    st.error("File JSON non valido o danneggiato.")
+                except Exception as e:
+                    st.error(f"Errore durante l'importazione: {e}")
 
     st.divider()
     st.subheader("📊 Registro Accessi dalla Home")
