@@ -2,7 +2,6 @@ import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
 import altair as alt
-import io
 import time
 import os
 import json
@@ -37,27 +36,80 @@ st.set_page_config(
 )
 
 # =====================================================================
-# COSTANTI RUOLI IN CAMPO, EFFICACIA PASSAGGI & UTENTI HOME
+# COSTANTI RUOLI, AREE DI GIOCO, PARAMETRI SNELLI & UTENTI HOME
 # =====================================================================
 RUOLI_DIFENSORI = ["TS", "DC", "TD"]
 RUOLI_CENTROCAMPISTI = ["CDC", "CC", "TQ"]
 RUOLI_ATTACCANTI = ["AS", "AT", "AD"]
 TUTTI_RUOLI_MOVIMENTO = RUOLI_DIFENSORI + RUOLI_CENTROCAMPISTI + RUOLI_ATTACCANTI
 
-OPZIONI_EFFICACIA_PASSAGGI = ["Ottima", "Buona", "Sufficiente", "Insufficiente", "Pessima"]
-DELTA_EFFICACIA_PASSAGGI = {
-    "Ottima": 0.7,
-    "Buona": 0.4,
-    "Sufficiente": 0.1,
-    "Insufficiente": -0.3,
-    "Pessima": -0.5,
+OPZIONI_IMPATTO_PARTITA = ["Decisivo", "Positivo", "Ordinato", "Sottotono", "In difficoltà"]
+DELTA_IMPATTO_PARTITA = {
+    "Decisivo": 0.9,
+    "Positivo": 0.5,
+    "Ordinato": 0.1,
+    "Sottotono": -0.4,
+    "In difficoltà": -0.8,
 }
-SCALA_MEDIA_EFFICACIA_PASSAGGI = {
-    "Ottima": 2.0,
-    "Buona": 1.0,
-    "Sufficiente": 0.0,
-    "Insufficiente": -1.0,
-    "Pessima": -2.0,
+SCALA_IMPATTO_PARTITA = {
+    "Decisivo": 2.0,
+    "Positivo": 1.0,
+    "Ordinato": 0.0,
+    "Sottotono": -1.0,
+    "In difficoltà": -2.0,
+}
+
+OPZIONI_GESTIONE_PALLA = ["Dominante", "Pulita", "Altalenante", "Imprecisa"]
+DELTA_GESTIONE_PALLA = {
+    "Dominante": 0.6,
+    "Pulita": 0.3,
+    "Altalenante": -0.1,
+    "Imprecisa": -0.5,
+}
+SCALA_GESTIONE_PALLA = {
+    "Dominante": 2.0,
+    "Pulita": 1.0,
+    "Altalenante": -0.5,
+    "Imprecisa": -2.0,
+}
+
+OPZIONI_SICUREZZA_PORTIERE = ["Dominante", "Affidabile", "Altalenante", "Insicuro"]
+DELTA_SICUREZZA_PORTIERE = {
+    "Dominante": 0.7,
+    "Affidabile": 0.3,
+    "Altalenante": -0.2,
+    "Insicuro": -0.7,
+}
+SCALA_SICUREZZA_PORTIERE = {
+    "Dominante": 2.0,
+    "Affidabile": 1.0,
+    "Altalenante": -0.5,
+    "Insicuro": -2.0,
+}
+
+# Pesi per area di gioco (Difesa, Centrocampo, Attacco)
+PESI_AREA_GIOCO = {
+    "DIFENSORE": {
+        "etichetta": "Difesa",
+        "impatto": 1.4,
+        "gestione": 1.5,
+        "assist": 0.8,
+        "errori": 1.4,
+    },
+    "CENTROCAMPISTA": {
+        "etichetta": "Centrocampo",
+        "impatto": 1.3,
+        "gestione": 1.4,
+        "assist": 1.1,
+        "errori": 1.2,
+    },
+    "ATTACCANTE": {
+        "etichetta": "Attacco",
+        "impatto": 1.4,
+        "gestione": 0.8,
+        "assist": 1.3,
+        "errori": 0.8,
+    },
 }
 
 TUTTE_LE_SCHEDE_APP = [
@@ -117,35 +169,44 @@ def sincronizza_client_localstorage(utente_da_salvare=None):
             width=0,
         )
 
-def normalizza_efficacia_passaggi(valore):
-    """Converte valori vecchi (es. percentuali o stringhe) in una categoria valida."""
-    if isinstance(valore, str) and valore.strip() in DELTA_EFFICACIA_PASSAGGI:
-        return valore.strip()
-    try:
-        pct = float(valore)
-        if pct >= 85:
-            return "Ottima"
-        elif pct >= 75:
-            return "Buona"
-        elif pct >= 60:
-            return "Sufficiente"
-        elif pct >= 40:
-            return "Insufficiente"
-        else:
-            return "Pessima"
-    except Exception:
-        return "Buona"
+def normalizza_impatto_partita(valore):
+    val = str(valore or "").strip()
+    if val in DELTA_IMPATTO_PARTITA:
+        return val
+    mappa_vecchia = {
+        "Ottima": "Decisivo",
+        "Buona": "Positivo",
+        "Sufficiente": "Ordinato",
+        "Insufficiente": "Sottotono",
+        "Pessima": "In difficoltà",
+    }
+    return mappa_vecchia.get(val, "Ordinato")
 
-def calcola_efficacia_passaggi_media(valori):
-    """Restituisce l'etichetta media finale su scala ordinata (con preferenza al livello superiore in caso di parità)."""
+def normalizza_gestione_palla(valore):
+    val = str(valore or "").strip()
+    if val in DELTA_GESTIONE_PALLA:
+        return val
+    mappa_vecchia = {
+        "Ottima": "Dominante",
+        "Buona": "Pulita",
+        "Sufficiente": "Altalenante",
+        "Insufficiente": "Imprecisa",
+        "Pessima": "Imprecisa",
+    }
+    return mappa_vecchia.get(val, "Pulita")
+
+def normalizza_sicurezza_portiere(valore):
+    val = str(valore or "").strip()
+    if val in DELTA_SICUREZZA_PORTIERE:
+        return val
+    return "Affidabile"
+
+def calcola_media_giudizio(valori, opzioni, scala):
+    """Restituisce l'etichetta media su scala ordinata."""
     if not valori:
         return "N.D."
-    normalizzati = [normalizza_efficacia_passaggi(v) for v in valori]
-    media_scala = sum(SCALA_MEDIA_EFFICACIA_PASSAGGI[e] for e in normalizzati) / len(normalizzati)
-    return min(
-        OPZIONI_EFFICACIA_PASSAGGI,
-        key=lambda k: abs(SCALA_MEDIA_EFFICACIA_PASSAGGI[k] - media_scala)
-    )
+    media_val = sum(scala[v] for v in valori if v in scala) / len(valori)
+    return min(opzioni, key=lambda k: abs(scala[k] - media_val))
 
 def get_macro_ruolo(ruolo_specifico):
     if ruolo_specifico in RUOLI_DIFENSORI:
@@ -155,6 +216,9 @@ def get_macro_ruolo(ruolo_specifico):
     elif ruolo_specifico in RUOLI_ATTACCANTI:
         return "ATTACCANTE"
     return "CENTROCAMPISTA"
+
+def get_etichetta_area(ruolo_specifico):
+    return PESI_AREA_GIOCO[get_macro_ruolo(ruolo_specifico)]["etichetta"]
 
 def ruolo_default_da_rosa(ruolo_rosa_str):
     r = (ruolo_rosa_str or "").upper()
@@ -170,25 +234,60 @@ def ruolo_default_da_rosa(ruolo_rosa_str):
         return "TQ"
     return "CC"
 
+def estrai_dati_movimento_compat(d_p):
+    """Legge i parametri snelli mantenendo retrocompatibilità con eventuali dati storici."""
+    impatto = normalizza_impatto_partita(
+        d_p.get("impatto_partita") or d_p.get("efficacia_passaggi") or d_p.get("passaggi") or "Ordinato"
+    )
+    gestione = normalizza_gestione_palla(
+        d_p.get("gestione_palla") or d_p.get("efficacia_passaggi") or "Pulita"
+    )
+    gol = int(d_p.get("gol_fatti", 0))
+    assist = int(d_p.get("assist", 0))
+    errori = int(d_p.get("errori_gravi", d_p.get("perse", 0)))
+    return {
+        "impatto_partita": impatto,
+        "gestione_palla": gestione,
+        "gol_fatti": gol,
+        "assist": assist,
+        "errori_gravi": errori,
+    }
+
+def estrai_dati_portiere_compat(d_p):
+    """Legge i parametri snelli del portiere mantenendo retrocompatibilità con dati storici."""
+    sicurezza = normalizza_sicurezza_portiere(d_p.get("sicurezza_portiere", "Affidabile"))
+    parate = int(d_p.get("parate_decisive", d_p.get("parate", 0)))
+    if "gol_subiti" in d_p or "errori_gravi" in d_p:
+        gol_sub = int(d_p.get("gol_subiti", 0))
+        errori_p = int(d_p.get("errori_gravi", 0))
+    else:
+        gol_sub, errori_p = parse_frazione(d_p.get("gol_subiti_resp", "0/0"))
+    return {
+        "sicurezza_portiere": sicurezza,
+        "parate_decisive": parate,
+        "gol_subiti": gol_sub,
+        "errori_gravi": errori_p,
+    }
+
 def valori_base_giocatore(nome_g, is_portiere, is_riserva, db_giocatori):
-    """Restituisce i valori iniziali/azzerati per un giocatore."""
+    """Restituisce i valori iniziali/azzerati per un giocatore nel modello snello e visivo."""
     min_default = 0 if is_riserva else 80
     if is_portiere:
         return {
             "minuti": min_default,
-            "parate": 0,
-            "uscite": "0/0",
-            "gol_subiti_resp": "0/0",
+            "sicurezza_portiere": "Affidabile",
+            "parate_decisive": 0,
+            "gol_subiti": 0,
+            "errori_gravi": 0,
         }
     return {
         "ruolo_campo": ruolo_default_da_rosa(db_giocatori.get(nome_g, {}).get("ruolo", "")),
         "minuti": min_default,
-        "duelli": "0/0",
-        "efficacia_passaggi": "Buona",
-        "perse": 0,
-        "tiri": "0/0",
+        "impatto_partita": "Ordinato",
+        "gestione_palla": "Pulita",
         "gol_fatti": 0,
-        "salvataggi": 0,
+        "assist": 0,
+        "errori_gravi": 0,
     }
 
 def ripristina_parametri_partita(partita_sel, p_dati, db_giocatori):
@@ -221,33 +320,34 @@ def ripristina_parametri_partita(partita_sel, p_dati, db_giocatori):
 
         nuovi_dati[nome_g] = base.copy()
 
-        # Aggiorna subito i widget dei parametri (escludendo ruolo_... / ruolo_res_...)
         if not is_riserva:
             if is_portiere:
                 st.session_state[f"min_{partita_sel}_{num_int}"] = int(base["minuti"])
-                st.session_state[f"par_{partita_sel}_{num_int}"] = int(base["parate"])
-                st.session_state[f"usc_{partita_sel}_{num_int}"] = str(base["uscite"])
-                st.session_state[f"gol_sub_{partita_sel}_{num_int}"] = str(base["gol_subiti_resp"])
+                st.session_state[f"sic_{partita_sel}_{num_int}"] = str(base["sicurezza_portiere"])
+                st.session_state[f"par_{partita_sel}_{num_int}"] = int(base["parate_decisive"])
+                st.session_state[f"gsub_{partita_sel}_{num_int}"] = int(base["gol_subiti"])
+                st.session_state[f"errp_{partita_sel}_{num_int}"] = int(base["errori_gravi"])
             else:
                 st.session_state[f"min_{partita_sel}_{num_int}"] = int(base["minuti"])
-                st.session_state[f"due_{partita_sel}_{num_int}"] = str(base["duelli"])
-                st.session_state[f"pas_{partita_sel}_{num_int}"] = str(base["efficacia_passaggi"])
-                st.session_state[f"per_{partita_sel}_{num_int}"] = int(base["perse"])
-                st.session_state[f"tir_{partita_sel}_{num_int}"] = str(base["tiri"])
+                st.session_state[f"imp_{partita_sel}_{num_int}"] = str(base["impatto_partita"])
+                st.session_state[f"ges_{partita_sel}_{num_int}"] = str(base["gestione_palla"])
                 st.session_state[f"gol_{partita_sel}_{num_int}"] = int(base["gol_fatti"])
+                st.session_state[f"ass_{partita_sel}_{num_int}"] = int(base["assist"])
+                st.session_state[f"err_{partita_sel}_{num_int}"] = int(base["errori_gravi"])
         else:
             if is_portiere:
                 st.session_state[f"min_res_{partita_sel}_{num_int}"] = int(base["minuti"])
-                st.session_state[f"par_res_{partita_sel}_{num_int}"] = int(base["parate"])
-                st.session_state[f"usc_res_{partita_sel}_{num_int}"] = str(base["uscite"])
-                st.session_state[f"gol_sub_res_{partita_sel}_{num_int}"] = str(base["gol_subiti_resp"])
+                st.session_state[f"sic_res_{partita_sel}_{num_int}"] = str(base["sicurezza_portiere"])
+                st.session_state[f"par_res_{partita_sel}_{num_int}"] = int(base["parate_decisive"])
+                st.session_state[f"gsub_res_{partita_sel}_{num_int}"] = int(base["gol_subiti"])
+                st.session_state[f"errp_res_{partita_sel}_{num_int}"] = int(base["errori_gravi"])
             else:
                 st.session_state[f"min_res_{partita_sel}_{num_int}"] = int(base["minuti"])
-                st.session_state[f"due_res_{partita_sel}_{num_int}"] = str(base["duelli"])
-                st.session_state[f"pas_res_{partita_sel}_{num_int}"] = str(base["efficacia_passaggi"])
-                st.session_state[f"per_res_{partita_sel}_{num_int}"] = int(base["perse"])
-                st.session_state[f"tir_res_{partita_sel}_{num_int}"] = str(base["tiri"])
+                st.session_state[f"imp_res_{partita_sel}_{num_int}"] = str(base["impatto_partita"])
+                st.session_state[f"ges_res_{partita_sel}_{num_int}"] = str(base["gestione_palla"])
                 st.session_state[f"gol_res_{partita_sel}_{num_int}"] = int(base["gol_fatti"])
+                st.session_state[f"ass_res_{partita_sel}_{num_int}"] = int(base["assist"])
+                st.session_state[f"err_res_{partita_sel}_{num_int}"] = int(base["errori_gravi"])
 
     p_dati["dati_prestazione"] = nuovi_dati
     st.session_state["partita_attiva"] = partita_sel
@@ -331,7 +431,7 @@ def carica_dati_da_disco():
         try:
             with open(DB_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except:
+        except Exception:
             pass
     return None
 
@@ -339,7 +439,6 @@ def inizializza_sicurezza_ruoli(dati_salvati):
     if "auth_config" not in st.session_state:
         cfg_salvata = (dati_salvati or {}).get("auth_config", {})
         st.session_state["auth_config"] = {
-            # PIN predefinito: "1234" -> modificabile dal Pannello Admin
             "admin_pin_hash": cfg_salvata.get("admin_pin_hash") or _hash_pin("1234"),
             "read_only_boys": bool(cfg_salvata.get("read_only_boys", True)),
             "sezioni_ragazzi": cfg_salvata.get("sezioni_ragazzi") or [
@@ -416,7 +515,7 @@ def estrai_youtube_id(url):
     return None
 
 def parse_data_partita(data_str):
-    """Converte una stringa data in oggetto datetime per ordinamento sicuro (fallback a data odierna se non parsabile)"""
+    """Converte una stringa data in oggetto datetime per ordinamento sicuro."""
     for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y"):
         try:
             return datetime.strptime(data_str.strip(), fmt)
@@ -642,6 +741,20 @@ st.markdown(f"""
         margin-top: 24px;
     }}
 
+    .scoutai-area-badge {{
+        display: inline-block;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.6px;
+        text-transform: uppercase;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background-color: {hex_to_rgba(accent_hex, 0.16)};
+        border: 1px solid {glow_border_rgba};
+        color: {accent_hex} !important;
+        margin-left: 8px;
+    }}
+
     .scoutai-video-empty {{
         background-color: {tema['bg_card']};
         border: 2px dashed {glow_border_rgba};
@@ -821,99 +934,59 @@ with col_title_h:
 st.divider()
 
 # =====================================================================
-# MOTORE DI CALCOLO VOTO & TREND (PESATO PER RUOLO)
+# MOTORE DI CALCOLO VOTO SNELLO & VISIVO (PESATO PER AREA DI GIOCO)
 # =====================================================================
 def calcola_voto(p, is_portiere=False):
     try:
-        minuti_giocati = int(p.get('minuti', 80))
+        minuti_giocati = int(p.get("minuti", 80))
         if minuti_giocati <= 0:
             return None
-        fattore_tempo = minuti_giocati / 80.0
+
+        # Fattore minutaggio morbido (chi gioca almeno 55' prende peso pieno sui giudizi)
+        fattore_tempo = min(1.0, max(0.35, minuti_giocati / 60.0))
         rating = 6.0
 
         if is_portiere:
-            parate = int(p.get('parate', 0))
-            uscite_v, uscite_t = map(int, p.get('uscite', '0/0').split("/"))
-            gol_subiti, gol_resp = map(int, p.get('gol_subiti_resp', '0/0').split("/"))
+            dati_p = estrai_dati_portiere_compat(p)
+            delta_sic = DELTA_SICUREZZA_PORTIERE.get(dati_p["sicurezza_portiere"], 0.0)
+            parate_dec = dati_p["parate_decisive"]
+            gol_sub = dati_p["gol_subiti"]
+            errori_g = dati_p["errori_gravi"]
 
-            rating += (parate * 0.4) * fattore_tempo
-            
-            pct_uscite = (uscite_v / uscite_t) if uscite_t > 0 else 0
-            if pct_uscite >= 0.75 and uscite_t >= 1:
-                rating += 0.3 * fattore_tempo
-            elif pct_uscite < 0.40 and uscite_t > 0:
-                rating -= 0.3 * fattore_tempo
-
-            rating -= (gol_subiti * 0.4) * fattore_tempo
-            rating -= (gol_resp * 1.0) * fattore_tempo
+            rating += delta_sic * fattore_tempo
+            rating += parate_dec * 0.5
+            rating -= gol_sub * 0.3
+            rating -= errori_g * 1.0
         else:
             ruolo_campo = p.get("ruolo_campo", "CC")
             macro_ruolo = get_macro_ruolo(ruolo_campo)
+            pesi = PESI_AREA_GIOCO[macro_ruolo]
 
-            duelli_v, duelli_t = map(int, p.get('duelli', '0/0').split("/"))
-            val_raw_pass = p.get('efficacia_passaggi', p.get('passaggi', 'Buona'))
-            efficacia_pass = normalizza_efficacia_passaggi(val_raw_pass)
-            delta_pass = DELTA_EFFICACIA_PASSAGGI.get(efficacia_pass, 0.0)
-            perse = int(p.get('perse', 0))
-            tiri_porta, tiri_specchio = map(int, p.get('tiri', '0/0').split("/"))
-            gol_fatti = int(p.get('gol_fatti', 0))
+            dati_m = estrai_dati_movimento_compat(p)
+            delta_imp = DELTA_IMPATTO_PARTITA.get(dati_m["impatto_partita"], 0.0)
+            delta_ges = DELTA_GESTIONE_PALLA.get(dati_m["gestione_palla"], 0.0)
+            gol_fatti = dati_m["gol_fatti"]
+            assist = dati_m["assist"]
+            errori_gravi = dati_m["errori_gravi"]
 
-            pct_duelli = (duelli_v / duelli_t) if duelli_t > 0 else 0
-
-            if macro_ruolo == "DIFENSORE":
-                peso_duelli = 1.8
-                peso_passaggi = 0.5
-                peso_perse = 0.5
-                peso_tiri = 0.5
-                soglia_duelli_min = 2
-            elif macro_ruolo == "CENTROCAMPISTA":
-                peso_duelli = 0.7
-                peso_passaggi = 1.7
-                peso_perse = 1.7
-                peso_tiri = 0.6
-                soglia_duelli_min = 3
-            else:
-                peso_duelli = 0.6
-                peso_passaggi = 0.5
-                peso_perse = 0.6
-                peso_tiri = 1.9
-                soglia_duelli_min = 2
-
-            if pct_duelli >= 0.75 and duelli_t >= soglia_duelli_min:
-                rating += (0.4 * peso_duelli) * min(1.0, fattore_tempo + 0.2)
-            elif pct_duelli >= 0.55 and duelli_t >= soglia_duelli_min and macro_ruolo == "DIFENSORE":
-                rating += (0.2 * peso_duelli) * fattore_tempo
-            elif pct_duelli < 0.40 and duelli_t > 0:
-                rating -= (0.4 * peso_duelli) * fattore_tempo
-
-            if delta_pass >= 0:
-                rating += (delta_pass * peso_passaggi) * min(1.0, fattore_tempo + 0.2)
-            else:
-                rating += (delta_pass * peso_passaggi) * fattore_tempo
-
-            if perse > 0:
-                rating -= (perse * 0.6 * peso_perse) * fattore_tempo
-
-            if tiri_specchio > 0:
-                efficacia = tiri_porta / tiri_specchio
-                if efficacia >= 0.66:
-                    rating += (0.4 * peso_tiri) * fattore_tempo
-                elif tiri_specchio >= 2 and efficacia < 0.30:
-                    rating -= (0.2 * peso_tiri) * fattore_tempo
-
-            if gol_fatti > 0:
-                rating += (gol_fatti * 1.0)
+            rating += (delta_imp * pesi["impatto"]) * fattore_tempo
+            rating += (delta_ges * pesi["gestione"]) * fattore_tempo
+            rating += gol_fatti * 1.0
+            rating += assist * (0.5 * pesi["assist"])
+            rating -= errori_gravi * (0.6 * pesi["errori"])
 
         return round(max(1.0, min(10.0, rating)), 1)
-    except:
+    except Exception:
         return 6.0
 
 def calcola_trend_giocatore(storico_voti):
     if len(storico_voti) < 2:
         return "Stabile (↔️)"
-    diff = round(storico_voti[-1] - (sum(storico_voti[:-1])/len(storico_voti[:-1])), 1)
-    if diff > 0: return f"In Crescita 📈 (+{diff})"
-    elif diff < 0: return f"In Decrescita 📉 ({diff})"
+    diff = round(storico_voti[-1] - (sum(storico_voti[:-1]) / len(storico_voti[:-1])), 1)
+    if diff > 0:
+        return f"In Crescita 📈 (+{diff})"
+    elif diff < 0:
+        return f"In Decrescita 📉 ({diff})"
     return "Stabile (↔️)"
 
 # =====================================================================
@@ -973,7 +1046,7 @@ def genera_pdf_partita(match_name, match_data, db_giocatori, accent_hex):
     ))
     elements.append(Spacer(1, 10))
 
-    t_data = [["N°", "Foto", "Giocatore", "Ruolo", "Min.", "Statistiche Chiave", "Voto"]]
+    t_data = [["N°", "Foto", "Giocatore", "Ruolo / Area", "Min.", "Valutazione Rapida", "Voto"]]
     for num, nome in match_data["formazione"].items():
         if not nome:
             continue
@@ -981,36 +1054,38 @@ def genera_pdf_partita(match_name, match_data, db_giocatori, accent_hex):
         is_portiere = (str(num) in ["1", "12"])
         voto_calcolato = calcola_voto(p_dati, is_portiere) if p_dati else None
         voto = str(voto_calcolato) if voto_calcolato is not None else "N.D."
-        ruolo = p_dati.get("ruolo_campo") or db_giocatori.get(nome, {}).get(
-            "ruolo", "Portiere" if is_portiere else "Movimento"
-        )
+
+        if is_portiere:
+            ruolo_label = "POR (Porta)"
+            dp = estrai_dati_portiere_compat(p_dati)
+            stats = (
+                f"Sicurezza: {dp['sicurezza_portiere']} | "
+                f"Parate dec.: {dp['parate_decisive']} | "
+                f"Gol sub.: {dp['gol_subiti']} | "
+                f"Errori: {dp['errori_gravi']}"
+            )
+        else:
+            ruolo_c = p_dati.get("ruolo_campo") or ruolo_default_da_rosa(
+                db_giocatori.get(nome, {}).get("ruolo", "")
+            )
+            ruolo_label = f"{ruolo_c} ({get_etichetta_area(ruolo_c)})"
+            dm = estrai_dati_movimento_compat(p_dati)
+            stats = (
+                f"Impatto: {dm['impatto_partita']} | "
+                f"Palla: {dm['gestione_palla']} | "
+                f"Gol: {dm['gol_fatti']} | "
+                f"Assist: {dm['assist']} | "
+                f"Errori: {dm['errori_gravi']}"
+            )
 
         foto_path = ottieni_foto_valida(nome, db_giocatori)
         foto_cell = _crea_immagine_pdf_adattata(foto_path, max_w=28, max_h=28) if foto_path else Paragraph("-", cell_style)
-
-        if is_portiere:
-            stats = (
-                f"Parate: {p_dati.get('parate', 0)} | "
-                f"Uscite: {p_dati.get('uscite', '0/0')} | "
-                f"Gol Sub./Resp.: {p_dati.get('gol_subiti_resp', '0/0')}"
-            )
-        else:
-            eff_pass = normalizza_efficacia_passaggi(
-                p_dati.get('efficacia_passaggi', p_dati.get('passaggi', 'Buona'))
-            )
-            stats = (
-                f"Duelli: {p_dati.get('duelli', '0/0')} | "
-                f"Efficacia Pass.: {eff_pass} | "
-                f"Perse: {p_dati.get('perse', 0)} | "
-                f"Tiri: {p_dati.get('tiri', '0/0')} | "
-                f"Gol: {p_dati.get('gol_fatti', 0)}"
-            )
 
         t_data.append([
             str(num),
             foto_cell,
             Paragraph(nome, cell_style),
-            Paragraph(ruolo, cell_style),
+            Paragraph(ruolo_label, cell_style),
             f"{p_dati.get('minuti', 80)}'",
             Paragraph(stats, cell_style),
             str(voto)
@@ -1202,11 +1277,15 @@ if menu == "📋 Setup Partite & Formazioni":
 
     if db_partite and partita_selezionata in db_partite:
         p_info = db_partite[partita_selezionata]
-        
-        if "risultato" not in p_info: p_info["risultato"] = "N.D."
-        if "casa_trasferta" not in p_info: p_info["casa_trasferta"] = "Casa"
-        if "youtube_link" not in p_info: p_info["youtube_link"] = ""
-        if "dati_prestazione" not in p_info: p_info["dati_prestazione"] = {}
+
+        if "risultato" not in p_info:
+            p_info["risultato"] = "N.D."
+        if "casa_trasferta" not in p_info:
+            p_info["casa_trasferta"] = "Casa"
+        if "youtube_link" not in p_info:
+            p_info["youtube_link"] = ""
+        if "dati_prestazione" not in p_info:
+            p_info["dati_prestazione"] = {}
 
         st.divider()
         st.subheader(f"⚙️ Configurazione Partita & Formazione: {partita_selezionata}")
@@ -1260,7 +1339,7 @@ if menu == "📋 Setup Partite & Formazioni":
                     with cols_tit[(i-1) % 4]:
                         curr_val = formazione_corrente.get(str(i), formazione_corrente.get(i, ""))
                         selezionati_altrove = [
-                            val for k, val in formazione_corrente.items() 
+                            val for k, val in formazione_corrente.items()
                             if str(k) != str(i) and val != ""
                         ]
                         opzioni_slot = [""] + [g for g in tutta_rosa if g not in selezionati_altrove or g == curr_val]
@@ -1274,7 +1353,7 @@ if menu == "📋 Setup Partite & Formazioni":
                     with cols_res[(i-12) % 3]:
                         curr_val = formazione_corrente.get(str(i), formazione_corrente.get(i, ""))
                         selezionati_altrove = [
-                            val for k, val in formazione_corrente.items() 
+                            val for k, val in formazione_corrente.items()
                             if str(k) != str(i) and val != ""
                         ]
                         opzioni_slot = [""] + [g for g in tutta_rosa if g not in selezionati_altrove or g == curr_val]
@@ -1293,10 +1372,10 @@ if menu == "📋 Setup Partite & Formazioni":
                     st.rerun()
 
 # =====================================================================
-# 2. INSERIMENTO PARAMETRI & VOTI
+# 2. INSERIMENTO PARAMETRI & VOTI (MODELLO SNELLO & VISIVO)
 # =====================================================================
 elif menu == "⚡ Inserimento Parametri & Voti":
-    st.title("⚡ Inserimento Parametri Post-Partita & Voti")
+    st.title("⚡ Valutazione Snella Post-Partita & Voti")
     lettura_only = is_sola_lettura()
 
     if not db_partite:
@@ -1320,7 +1399,10 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 st.success("Valori ripristinati ai dati base (ruoli mantenuti)!")
                 st.rerun()
 
-    st.caption("Efficacia passaggi: Ottima (+0,7) · Buona (+0,4) · Sufficiente (+0,1) · Insufficiente (-0,3) · Pessima (-0,5), pesata sul ruolo. Gol = +1 per tutti. Con 0' giocati il voto non viene conteggiato.")
+    st.caption(
+        "Modello Snello & Visivo: scegli **Impatto partita** e **Gestione palla / duelli** (pesati automaticamente su **Difesa**, **Centrocampo** o **Attacco**), "
+        "poi segna solo gli eventi chiave (**Gol**, **Assist**, **Errori gravi**). Con `0'` giocati il voto resta `N.D.`."
+    )
 
     if lettura_only:
         righe_lettura = []
@@ -1332,22 +1414,26 @@ elif menu == "⚡ Inserimento Parametri & Voti":
             min_g = int(p_g.get("minuti", 0)) if p_g else 0
             voto_g = calcola_voto(p_g, is_portiere) if (p_g and min_g > 0) else None
             if is_portiere:
+                dp = estrai_dati_portiere_compat(p_g)
+                ruolo_str = "POR (Porta)"
                 dettaglio = (
-                    f"Parate: {p_g.get('parate', 0)} | Uscite: {p_g.get('uscite', '0/0')} | "
-                    f"Gol Sub./Resp.: {p_g.get('gol_subiti_resp', '0/0')}"
+                    f"Sicurezza: {dp['sicurezza_portiere']} | Parate dec.: {dp['parate_decisive']} | "
+                    f"Gol sub.: {dp['gol_subiti']} | Errori: {dp['errori_gravi']}"
                 )
             else:
-                eff_g = normalizza_efficacia_passaggi(p_g.get("efficacia_passaggi", p_g.get("passaggi", "Buona")))
+                ruolo_c = p_g.get("ruolo_campo") or ruolo_default_da_rosa(db_giocatori.get(nome, {}).get("ruolo", ""))
+                ruolo_str = f"{ruolo_c} ({get_etichetta_area(ruolo_c)})"
+                dm = estrai_dati_movimento_compat(p_g)
                 dettaglio = (
-                    f"Duelli: {p_g.get('duelli', '0/0')} | Passaggi: {eff_g} | "
-                    f"Perse: {p_g.get('perse', 0)} | Tiri: {p_g.get('tiri', '0/0')} | Gol: {p_g.get('gol_fatti', 0)}"
+                    f"Impatto: {dm['impatto_partita']} | Palla/Duelli: {dm['gestione_palla']} | "
+                    f"Gol: {dm['gol_fatti']} | Assist: {dm['assist']} | Errori: {dm['errori_gravi']}"
                 )
             righe_lettura.append({
                 "N°": str(n),
                 "Giocatore": nome,
-                "Ruolo": p_g.get("ruolo_campo") or ("POR" if is_portiere else ruolo_default_da_rosa(db_giocatori.get(nome, {}).get("ruolo", ""))),
+                "Ruolo / Area": ruolo_str,
                 "Minuti": f"{min_g}'",
-                "Parametri": dettaglio,
+                "Valutazione": dettaglio,
                 "Voto": f"{voto_g} / 10" if voto_g is not None else "N.D."
             })
         if righe_lettura:
@@ -1359,65 +1445,92 @@ elif menu == "⚡ Inserimento Parametri & Voti":
             st.markdown("### 🔴 TITOLARI (Maglie 1 - 11)")
             for i in range(1, 12):
                 nome_g = p_dati["formazione"].get(str(i), p_dati["formazione"].get(i, ""))
-                if not nome_g: continue
-                
+                if not nome_g:
+                    continue
+
                 is_portiere = (i == 1)
                 default_ruolo_g = ruolo_default_da_rosa(db_giocatori.get(nome_g, {}).get("ruolo", ""))
                 current_vals = p_dati["dati_prestazione"].get(nome_g, {})
 
                 if is_portiere:
-                    st.markdown(f"**N° {i} — {nome_g}** *(PORTIERE)*")
-                    c1, c2, c3, c4, c_voto = st.columns([1.5, 1.5, 1.5, 1.5, 1])
+                    dp_curr = estrai_dati_portiere_compat(current_vals)
+                    st.markdown(
+                        f"**N° {i} — {nome_g}** <span class='scoutai-area-badge'>Porta</span>",
+                        unsafe_allow_html=True
+                    )
+                    c1, c2, c3, c4, c5, c_voto = st.columns([0.9, 1.4, 1.0, 1.0, 1.0, 1.0])
                     with c1:
                         minuti = st.number_input("Minuti", 0, 80, int(current_vals.get("minuti", 80)), key=f"min_{partita_sel}_{i}")
                     with c2:
-                        parate = st.number_input("Parate", 0, 20, int(current_vals.get("parate", 0)), key=f"par_{partita_sel}_{i}")
+                        idx_sic = OPZIONI_SICUREZZA_PORTIERE.index(dp_curr["sicurezza_portiere"])
+                        sicurezza_p = st.selectbox("Sicurezza & Uscite", OPZIONI_SICUREZZA_PORTIERE, index=idx_sic, key=f"sic_{partita_sel}_{i}")
                     with c3:
-                        uscite = st.text_input("Uscite tent./rius.", str(current_vals.get("uscite", "0/1")), key=f"usc_{partita_sel}_{i}")
+                        parate_dec = st.number_input("Parate dec.", 0, 15, int(dp_curr["parate_decisive"]), key=f"par_{partita_sel}_{i}")
                     with c4:
-                        gol_subiti_resp = st.text_input("Gol sub./resp.", str(current_vals.get("gol_subiti_resp", "0/0")), key=f"gol_sub_{partita_sel}_{i}")
-                    
-                    temp_dict = {"minuti": minuti, "parate": parate, "uscite": uscite, "gol_subiti_resp": gol_subiti_resp}
+                        gol_sub = st.number_input("Gol subiti", 0, 15, int(dp_curr["gol_subiti"]), key=f"gsub_{partita_sel}_{i}")
+                    with c5:
+                        errori_p = st.number_input("Errori gravi", 0, 10, int(dp_curr["errori_gravi"]), key=f"errp_{partita_sel}_{i}")
+
+                    temp_dict = {
+                        "minuti": minuti,
+                        "sicurezza_portiere": sicurezza_p,
+                        "parate_decisive": parate_dec,
+                        "gol_subiti": gol_sub,
+                        "errori_gravi": errori_p,
+                    }
                     voto_live = calcola_voto(temp_dict, is_portiere=True)
                     voto_live_txt = str(voto_live) if voto_live is not None else "N.D."
-                    
+
                     with c_voto:
                         st.markdown(f"<div class='scoutai-voto-box'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live_txt}</span></div>", unsafe_allow_html=True)
 
                     p_dati["dati_prestazione"][nome_g] = temp_dict
                 else:
-                    c_gioc, c_ruolo = st.columns([2.2, 1.2])
+                    dm_curr = estrai_dati_movimento_compat(current_vals)
+                    val_ruolo = current_vals.get("ruolo_campo", default_ruolo_g)
+                    if val_ruolo not in TUTTI_RUOLI_MOVIMENTO:
+                        val_ruolo = "CC"
+                    area_gioco_label = get_etichetta_area(val_ruolo)
+
+                    c_gioc, c_ruolo = st.columns([2.4, 1.0])
                     with c_gioc:
-                        st.markdown(f"<div style='padding-top: 6px;'><strong>N° {i} — {nome_g}</strong></div>", unsafe_allow_html=True)
+                        st.markdown(
+                            f"<div style='padding-top: 6px;'><strong>N° {i} — {nome_g}</strong>"
+                            f"<span class='scoutai-area-badge'>{area_gioco_label}</span></div>",
+                            unsafe_allow_html=True
+                        )
                     with c_ruolo:
-                        val_ruolo = current_vals.get("ruolo_campo", default_ruolo_g)
-                        idx_ruolo = TUTTI_RUOLI_MOVIMENTO.index(val_ruolo) if val_ruolo in TUTTI_RUOLI_MOVIMENTO else TUTTI_RUOLI_MOVIMENTO.index("CC")
+                        idx_ruolo = TUTTI_RUOLI_MOVIMENTO.index(val_ruolo)
                         ruolo_campo = st.selectbox("Ruolo", TUTTI_RUOLI_MOVIMENTO, index=idx_ruolo, key=f"ruolo_{partita_sel}_{i}", label_visibility="collapsed")
 
-                    c1, c2, c3, c4, c5, c6, c_voto = st.columns([1, 1, 1.3, 0.8, 1, 0.8, 1])
+                    c1, c2, c3, c4, c5, c6, c_voto = st.columns([0.85, 1.35, 1.35, 0.8, 0.85, 0.9, 1.0])
                     with c1:
                         minuti = st.number_input("Minuti", 0, 80, int(current_vals.get("minuti", 80)), key=f"min_{partita_sel}_{i}")
                     with c2:
-                        duelli = st.text_input("Duelli V/T", str(current_vals.get("duelli", "5/5")), key=f"due_{partita_sel}_{i}")
+                        idx_imp = OPZIONI_IMPATTO_PARTITA.index(dm_curr["impatto_partita"])
+                        impatto_partita = st.selectbox("Impatto partita", OPZIONI_IMPATTO_PARTITA, index=idx_imp, key=f"imp_{partita_sel}_{i}")
                     with c3:
-                        val_eff = normalizza_efficacia_passaggi(current_vals.get("efficacia_passaggi", current_vals.get("passaggi", "Buona")))
-                        idx_eff = OPZIONI_EFFICACIA_PASSAGGI.index(val_eff) if val_eff in OPZIONI_EFFICACIA_PASSAGGI else 1
-                        efficacia_passaggi = st.selectbox("Efficacia passaggi", OPZIONI_EFFICACIA_PASSAGGI, index=idx_eff, key=f"pas_{partita_sel}_{i}")
+                        idx_ges = OPZIONI_GESTIONE_PALLA.index(dm_curr["gestione_palla"])
+                        gestione_palla = st.selectbox("Palla & duelli", OPZIONI_GESTIONE_PALLA, index=idx_ges, key=f"ges_{partita_sel}_{i}")
                     with c4:
-                        perse = st.number_input("Perse", 0, 10, int(current_vals.get("perse", 0)), key=f"per_{partita_sel}_{i}")
+                        gol_fatti = st.number_input("Gol", 0, 10, int(dm_curr["gol_fatti"]), key=f"gol_{partita_sel}_{i}")
                     with c5:
-                        tiri = st.text_input("Tiri P/Sp", str(current_vals.get("tiri", "0/0")), key=f"tir_{partita_sel}_{i}")
+                        assist = st.number_input("Assist", 0, 10, int(dm_curr["assist"]), key=f"ass_{partita_sel}_{i}")
                     with c6:
-                        gol_fatti = st.number_input("Gol", 0, 5, int(current_vals.get("gol_fatti", 0)), key=f"gol_{partita_sel}_{i}")
-                    
+                        errori_gravi = st.number_input("Errori gravi", 0, 10, int(dm_curr["errori_gravi"]), key=f"err_{partita_sel}_{i}")
+
                     temp_dict = {
                         "ruolo_campo": ruolo_campo,
-                        "minuti": minuti, "duelli": duelli, "efficacia_passaggi": efficacia_passaggi,
-                        "perse": perse, "tiri": tiri, "gol_fatti": gol_fatti, "salvataggi": 0
+                        "minuti": minuti,
+                        "impatto_partita": impatto_partita,
+                        "gestione_palla": gestione_palla,
+                        "gol_fatti": gol_fatti,
+                        "assist": assist,
+                        "errori_gravi": errori_gravi,
                     }
                     voto_live = calcola_voto(temp_dict, is_portiere=False)
                     voto_live_txt = str(voto_live) if voto_live is not None else "N.D."
-                    
+
                     with c_voto:
                         st.markdown(f"<div class='scoutai-voto-box'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live_txt}</span></div>", unsafe_allow_html=True)
 
@@ -1430,65 +1543,92 @@ elif menu == "⚡ Inserimento Parametri & Voti":
             st.markdown("### 🔵 RISERVE / PANCHINA (Maglie 12 - 20)")
             for i in range(12, 21):
                 nome_g = p_dati["formazione"].get(str(i), p_dati["formazione"].get(i, ""))
-                if not nome_g: continue
-                
+                if not nome_g:
+                    continue
+
                 is_portiere = (i == 12)
                 default_ruolo_g = ruolo_default_da_rosa(db_giocatori.get(nome_g, {}).get("ruolo", ""))
                 current_vals = p_dati["dati_prestazione"].get(nome_g, {})
 
                 if is_portiere:
-                    st.markdown(f"**N° {i} — {nome_g} (Riserva)** *(PORTIERE)*")
-                    c1, c2, c3, c4, c_voto = st.columns([1.5, 1.5, 1.5, 1.5, 1])
+                    dp_curr = estrai_dati_portiere_compat(current_vals)
+                    st.markdown(
+                        f"**N° {i} — {nome_g} (Riserva)** <span class='scoutai-area-badge'>Porta</span>",
+                        unsafe_allow_html=True
+                    )
+                    c1, c2, c3, c4, c5, c_voto = st.columns([0.9, 1.4, 1.0, 1.0, 1.0, 1.0])
                     with c1:
                         minuti = st.number_input("Min sub", 0, 80, int(current_vals.get("minuti", 0)), key=f"min_res_{partita_sel}_{i}")
                     with c2:
-                        parate = st.number_input("Parate", 0, 20, int(current_vals.get("parate", 0)), key=f"par_res_{partita_sel}_{i}")
+                        idx_sic = OPZIONI_SICUREZZA_PORTIERE.index(dp_curr["sicurezza_portiere"])
+                        sicurezza_p = st.selectbox("Sicurezza & Uscite", OPZIONI_SICUREZZA_PORTIERE, index=idx_sic, key=f"sic_res_{partita_sel}_{i}")
                     with c3:
-                        uscite = st.text_input("Uscite tent./rius.", str(current_vals.get("uscite", "0/0")), key=f"usc_res_{partita_sel}_{i}")
+                        parate_dec = st.number_input("Parate dec.", 0, 15, int(dp_curr["parate_decisive"]), key=f"par_res_{partita_sel}_{i}")
                     with c4:
-                        gol_subiti_resp = st.text_input("Gol sub./resp.", str(current_vals.get("gol_subiti_resp", "0/0")), key=f"gol_sub_res_{partita_sel}_{i}")
-                    
-                    temp_dict_res = {"minuti": minuti, "parate": parate, "uscite": uscite, "gol_subiti_resp": gol_subiti_resp}
+                        gol_sub = st.number_input("Gol subiti", 0, 15, int(dp_curr["gol_subiti"]), key=f"gsub_res_{partita_sel}_{i}")
+                    with c5:
+                        errori_p = st.number_input("Errori gravi", 0, 10, int(dp_curr["errori_gravi"]), key=f"errp_res_{partita_sel}_{i}")
+
+                    temp_dict_res = {
+                        "minuti": minuti,
+                        "sicurezza_portiere": sicurezza_p,
+                        "parate_decisive": parate_dec,
+                        "gol_subiti": gol_sub,
+                        "errori_gravi": errori_p,
+                    }
                     voto_live_res = calcola_voto(temp_dict_res, is_portiere=True)
                     voto_live_res_txt = str(voto_live_res) if voto_live_res is not None else "N.D."
-                    
+
                     with c_voto:
                         st.markdown(f"<div class='scoutai-voto-box'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live_res_txt}</span></div>", unsafe_allow_html=True)
 
                     p_dati["dati_prestazione"][nome_g] = temp_dict_res
                 else:
-                    c_gioc, c_ruolo = st.columns([2.2, 1.2])
+                    dm_curr = estrai_dati_movimento_compat(current_vals)
+                    val_ruolo = current_vals.get("ruolo_campo", default_ruolo_g)
+                    if val_ruolo not in TUTTI_RUOLI_MOVIMENTO:
+                        val_ruolo = "CC"
+                    area_gioco_label = get_etichetta_area(val_ruolo)
+
+                    c_gioc, c_ruolo = st.columns([2.4, 1.0])
                     with c_gioc:
-                        st.markdown(f"<div style='padding-top: 6px;'><strong>N° {i} — {nome_g} (Riserva)</strong></div>", unsafe_allow_html=True)
+                        st.markdown(
+                            f"<div style='padding-top: 6px;'><strong>N° {i} — {nome_g} (Riserva)</strong>"
+                            f"<span class='scoutai-area-badge'>{area_gioco_label}</span></div>",
+                            unsafe_allow_html=True
+                        )
                     with c_ruolo:
-                        val_ruolo = current_vals.get("ruolo_campo", default_ruolo_g)
-                        idx_ruolo = TUTTI_RUOLI_MOVIMENTO.index(val_ruolo) if val_ruolo in TUTTI_RUOLI_MOVIMENTO else TUTTI_RUOLI_MOVIMENTO.index("CC")
+                        idx_ruolo = TUTTI_RUOLI_MOVIMENTO.index(val_ruolo)
                         ruolo_campo = st.selectbox("Ruolo", TUTTI_RUOLI_MOVIMENTO, index=idx_ruolo, key=f"ruolo_res_{partita_sel}_{i}", label_visibility="collapsed")
 
-                    c1, c2, c3, c4, c5, c6, c_voto = st.columns([1, 1, 1.3, 0.8, 1, 0.8, 1])
+                    c1, c2, c3, c4, c5, c6, c_voto = st.columns([0.85, 1.35, 1.35, 0.8, 0.85, 0.9, 1.0])
                     with c1:
                         minuti = st.number_input("Min sub", 0, 80, int(current_vals.get("minuti", 0)), key=f"min_res_{partita_sel}_{i}")
                     with c2:
-                        duelli = st.text_input("Duelli V/T", str(current_vals.get("duelli", "0/0")), key=f"due_res_{partita_sel}_{i}")
+                        idx_imp = OPZIONI_IMPATTO_PARTITA.index(dm_curr["impatto_partita"])
+                        impatto_partita = st.selectbox("Impatto partita", OPZIONI_IMPATTO_PARTITA, index=idx_imp, key=f"imp_res_{partita_sel}_{i}")
                     with c3:
-                        val_eff_res = normalizza_efficacia_passaggi(current_vals.get("efficacia_passaggi", current_vals.get("passaggi", "Buona")))
-                        idx_eff_res = OPZIONI_EFFICACIA_PASSAGGI.index(val_eff_res) if val_eff_res in OPZIONI_EFFICACIA_PASSAGGI else 1
-                        efficacia_passaggi = st.selectbox("Efficacia passaggi", OPZIONI_EFFICACIA_PASSAGGI, index=idx_eff_res, key=f"pas_res_{partita_sel}_{i}")
+                        idx_ges = OPZIONI_GESTIONE_PALLA.index(dm_curr["gestione_palla"])
+                        gestione_palla = st.selectbox("Palla & duelli", OPZIONI_GESTIONE_PALLA, index=idx_ges, key=f"ges_res_{partita_sel}_{i}")
                     with c4:
-                        perse = st.number_input("Perse", 0, 10, int(current_vals.get("perse", 0)), key=f"per_res_{partita_sel}_{i}")
+                        gol_fatti = st.number_input("Gol", 0, 10, int(dm_curr["gol_fatti"]), key=f"gol_res_{partita_sel}_{i}")
                     with c5:
-                        tiri = st.text_input("Tiri P/Sp", str(current_vals.get("tiri", "0/0")), key=f"tir_res_{partita_sel}_{i}")
+                        assist = st.number_input("Assist", 0, 10, int(dm_curr["assist"]), key=f"ass_res_{partita_sel}_{i}")
                     with c6:
-                        gol_fatti = st.number_input("Gol", 0, 5, int(current_vals.get("gol_fatti", 0)), key=f"gol_res_{partita_sel}_{i}")
-                    
+                        errori_gravi = st.number_input("Errori gravi", 0, 10, int(dm_curr["errori_gravi"]), key=f"err_res_{partita_sel}_{i}")
+
                     temp_dict_res = {
                         "ruolo_campo": ruolo_campo,
-                        "minuti": minuti, "duelli": duelli, "efficacia_passaggi": efficacia_passaggi,
-                        "perse": perse, "tiri": tiri, "gol_fatti": gol_fatti, "salvataggi": 0
+                        "minuti": minuti,
+                        "impatto_partita": impatto_partita,
+                        "gestione_palla": gestione_palla,
+                        "gol_fatti": gol_fatti,
+                        "assist": assist,
+                        "errori_gravi": errori_gravi,
                     }
                     voto_live_res = calcola_voto(temp_dict_res, is_portiere=False)
                     voto_live_res_txt = str(voto_live_res) if voto_live_res is not None else "N.D."
-                    
+
                     with c_voto:
                         st.markdown(f"<div class='scoutai-voto-box'><span style='font-size: 11px; display: block; color: #a0aec0;'>VOTO LIVE</span><span style='font-size: 20px; font-weight: bold; color: {accent_hex};'>{voto_live_res_txt}</span></div>", unsafe_allow_html=True)
 
@@ -1496,10 +1636,10 @@ elif menu == "⚡ Inserimento Parametri & Voti":
 
                 st.markdown("---")
 
-            if st.form_submit_button("💾 Salva Parametri e Calcola Voti"):
+            if st.form_submit_button("💾 Salva Valutazioni e Calcola Voti"):
                 st.session_state["partita_attiva"] = partita_sel
                 salva_dati_su_disco()
-                st.success("Parametri salvati automaticamente su disco e voti aggiornati per questa partita!")
+                st.success("Valutazioni salvate automaticamente su disco e voti aggiornati!")
                 st.rerun()
 
         st.divider()
@@ -1517,12 +1657,41 @@ elif menu == "⚡ Inserimento Parametri & Voti":
         with col_csv:
             righe_csv = []
             for n, nome in p_dati["formazione"].items():
-                if not nome: continue
+                if not nome:
+                    continue
                 is_portiere = (str(n) in ["1", "12"])
                 p_dati_g = p_dati["dati_prestazione"].get(nome, {})
                 voto = calcola_voto(p_dati_g, is_portiere)
-                righe_csv.append({"Numero": n, "Giocatore": nome, **p_dati_g, "Voto": voto if voto is not None else "N.D."})
-            
+                if is_portiere:
+                    dp = estrai_dati_portiere_compat(p_dati_g)
+                    righe_csv.append({
+                        "Numero": n,
+                        "Giocatore": nome,
+                        "Area": "Porta",
+                        "Minuti": p_dati_g.get("minuti", 0),
+                        "Sicurezza": dp["sicurezza_portiere"],
+                        "Parate Decisive": dp["parate_decisive"],
+                        "Gol Subiti": dp["gol_subiti"],
+                        "Errori Gravi": dp["errori_gravi"],
+                        "Voto": voto if voto is not None else "N.D."
+                    })
+                else:
+                    ruolo_c = p_dati_g.get("ruolo_campo") or ruolo_default_da_rosa(db_giocatori.get(nome, {}).get("ruolo", ""))
+                    dm = estrai_dati_movimento_compat(p_dati_g)
+                    righe_csv.append({
+                        "Numero": n,
+                        "Giocatore": nome,
+                        "Ruolo": ruolo_c,
+                        "Area": get_etichetta_area(ruolo_c),
+                        "Minuti": p_dati_g.get("minuti", 0),
+                        "Impatto Partita": dm["impatto_partita"],
+                        "Palla & Duelli": dm["gestione_palla"],
+                        "Gol": dm["gol_fatti"],
+                        "Assist": dm["assist"],
+                        "Errori Gravi": dm["errori_gravi"],
+                        "Voto": voto if voto is not None else "N.D."
+                    })
+
             df_match = pd.DataFrame(righe_csv)
             if not df_match.empty:
                 csv_data = df_match.to_csv(index=False).encode('utf-8')
@@ -1633,40 +1802,81 @@ elif menu == "🎥 Video Analisi":
         """, unsafe_allow_html=True)
 
 # =====================================================================
-# 4. RIEPILOGO SQUADRA & GIOCATORI
+# 4. RIEPILOGO SQUADRA & GIOCATORI (ADATTATO AL MODELLO SNELLO)
 # =====================================================================
 elif menu == "📈 Riepilogo Squadra":
     st.title("📈 Riepilogo Squadra & Statistiche Stagionali")
 
-    st.subheader("🏆 Elenco Partite & Voti Medi Squadra (Dal più vecchio al più recente)")
-    
+    st.subheader("🏆 Elenco Partite & Rendimento per Reparto")
+
     partite_ordinate = sorted(
         db_partite.items(),
         key=lambda item: parse_data_partita(item[1].get("data", "01/01/2026"))
     )
 
     partite_riepilogo = []
+    voti_reparti_stagione = {"Difesa": [], "Centrocampo": [], "Attacco": []}
+
     for p_nome, p_val in partite_ordinate:
         voti_match = []
+        voti_rep_match = {"Difesa": [], "Centrocampo": [], "Attacco": []}
+        gol_match = 0
+        assist_match = 0
+        errori_match = 0
+
         for n, nome in p_val.get("formazione", {}).items():
-            if not nome: continue
+            if not nome:
+                continue
             is_portiere = (str(n) in ["1", "12"])
             d_p = p_val.get("dati_prestazione", {}).get(nome, {})
             if d_p and int(d_p.get("minuti", 0)) > 0:
                 v_g = calcola_voto(d_p, is_portiere)
                 if v_g is not None:
                     voti_match.append(v_g)
-        
-        voto_medio = round(sum(voti_match)/len(voti_match), 1) if voti_match else None
+                    if is_portiere:
+                        dp = estrai_dati_portiere_compat(d_p)
+                        errori_match += dp["errori_gravi"]
+                    else:
+                        ruolo_c = d_p.get("ruolo_campo") or ruolo_default_da_rosa(
+                            db_giocatori.get(nome, {}).get("ruolo", "")
+                        )
+                        area_g = get_etichetta_area(ruolo_c)
+                        voti_rep_match[area_g].append(v_g)
+                        voti_reparti_stagione[area_g].append(v_g)
+
+                        dm = estrai_dati_movimento_compat(d_p)
+                        gol_match += dm["gol_fatti"]
+                        assist_match += dm["assist"]
+                        errori_match += dm["errori_gravi"]
+
+        voto_medio = round(sum(voti_match) / len(voti_match), 1) if voti_match else None
+        media_dif = round(sum(voti_rep_match["Difesa"]) / len(voti_rep_match["Difesa"]), 1) if voti_rep_match["Difesa"] else None
+        media_cen = round(sum(voti_rep_match["Centrocampo"]) / len(voti_rep_match["Centrocampo"]), 1) if voti_rep_match["Centrocampo"] else None
+        media_att = round(sum(voti_rep_match["Attacco"]) / len(voti_rep_match["Attacco"]), 1) if voti_rep_match["Attacco"] else None
+
         partite_riepilogo.append({
-            "Partita": p_nome, 
-            "Data": p_val["data"], 
-            "Risultato": p_val.get("risultato", "N.D."), 
-            "Casa/Trasferta": p_val.get("casa_trasferta", "Casa"),
-            "Modulo": p_val["modulo"], 
-            "Voto Medio Squadra": f"{voto_medio} / 10" if voto_medio is not None else "N.D."
+            "Partita": p_nome,
+            "Data": p_val["data"],
+            "Risultato": p_val.get("risultato", "N.D."),
+            "Luogo": p_val.get("casa_trasferta", "Casa"),
+            "Gol / Ass / Err": f"{gol_match} / {assist_match} / {errori_match}",
+            "Difesa": f"{media_dif}" if media_dif is not None else "-",
+            "Centrocampo": f"{media_cen}" if media_cen is not None else "-",
+            "Attacco": f"{media_att}" if media_att is not None else "-",
+            "Media Squadra": f"{voto_medio} / 10" if voto_medio is not None else "N.D."
         })
-    
+
+    col_rep1, col_rep2, col_rep3 = st.columns(3)
+    m_stag_dif = round(sum(voti_reparti_stagione["Difesa"]) / len(voti_reparti_stagione["Difesa"]), 1) if voti_reparti_stagione["Difesa"] else None
+    m_stag_cen = round(sum(voti_reparti_stagione["Centrocampo"]) / len(voti_reparti_stagione["Centrocampo"]), 1) if voti_reparti_stagione["Centrocampo"] else None
+    m_stag_att = round(sum(voti_reparti_stagione["Attacco"]) / len(voti_reparti_stagione["Attacco"]), 1) if voti_reparti_stagione["Attacco"] else None
+
+    col_rep1.metric("🛡️ Media Reparto Difesa", f"{m_stag_dif} / 10" if m_stag_dif is not None else "N.D.")
+    col_rep2.metric("⚙️ Media Reparto Centrocampo", f"{m_stag_cen} / 10" if m_stag_cen is not None else "N.D.")
+    col_rep3.metric("⚡ Media Reparto Attacco", f"{m_stag_att} / 10" if m_stag_att is not None else "N.D.")
+
+    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+
     if partite_riepilogo:
         st.table(pd.DataFrame(partite_riepilogo))
 
@@ -1697,19 +1907,17 @@ elif menu == "📈 Riepilogo Squadra":
     presenze_titolare = 0
     presenze_subentro = 0
 
-    tot_duelli_v = 0
-    tot_duelli_t = 0
-    lista_efficacia_passaggi = []
-    tot_perse = 0
-    tot_tiri_p = 0
-    tot_tiri_sp = 0
+    lista_impatti = []
+    lista_gestione = []
     tot_gol = 0
+    tot_assist = 0
+    tot_errori_mov = 0
 
-    tot_parate = 0
-    tot_uscite_v = 0
-    tot_uscite_t = 0
+    lista_sicurezza_p = []
+    tot_parate_dec = 0
     tot_gol_sub = 0
-    tot_gol_resp = 0
+    tot_errori_p = 0
+
     ha_dati_portiere = False
     ha_dati_movimento = False
     righe_match_giocatore = []
@@ -1735,48 +1943,37 @@ elif menu == "📈 Riepilogo Squadra":
                         elif 12 <= num_maglia <= 20:
                             presenze_subentro += 1
 
-                    if "parate" in d_p or "uscite" in d_p or "gol_subiti_resp" in d_p:
+                    if is_portiere or "sicurezza_portiere" in d_p or "parate_decisive" in d_p or "parate" in d_p:
                         ha_dati_portiere = True
-                        parate_m = int(d_p.get("parate", 0))
-                        uscite_m = str(d_p.get("uscite", "0/0"))
-                        gol_sub_resp_m = str(d_p.get("gol_subiti_resp", "0/0"))
+                        dp = estrai_dati_portiere_compat(d_p)
+                        if ha_minuti:
+                            lista_sicurezza_p.append(dp["sicurezza_portiere"])
+                        tot_parate_dec += dp["parate_decisive"]
+                        tot_gol_sub += dp["gol_subiti"]
+                        tot_errori_p += dp["errori_gravi"]
 
-                        tot_parate += parate_m
-                        u_v, u_t = parse_frazione(uscite_m)
-                        tot_uscite_v += u_v
-                        tot_uscite_t += u_t
-                        g_s, g_r = parse_frazione(gol_sub_resp_m)
-                        tot_gol_sub += g_s
-                        tot_gol_resp += g_r
-
-                        ruolo_match = "POR"
-                        parametri_str = f"Parate: {parate_m} | Uscite: {uscite_m} | Gol Sub./Resp.: {gol_sub_resp_m}"
+                        ruolo_match = "POR (Porta)"
+                        parametri_str = (
+                            f"Sicurezza: {dp['sicurezza_portiere']} | Parate dec.: {dp['parate_decisive']} | "
+                            f"Gol sub.: {dp['gol_subiti']} | Errori: {dp['errori_gravi']}"
+                        )
                     else:
                         ha_dati_movimento = True
-                        duelli_m = str(d_p.get("duelli", "0/0"))
-                        eff_pass_m = normalizza_efficacia_passaggi(
-                            d_p.get("efficacia_passaggi", d_p.get("passaggi", "Buona"))
-                        )
-                        perse_m = int(d_p.get("perse", 0))
-                        tiri_m = str(d_p.get("tiri", "0/0"))
-                        gol_m = int(d_p.get("gol_fatti", 0))
+                        dm = estrai_dati_movimento_compat(d_p)
+                        if ha_minuti:
+                            lista_impatti.append(dm["impatto_partita"])
+                            lista_gestione.append(dm["gestione_palla"])
+                        tot_gol += dm["gol_fatti"]
+                        tot_assist += dm["assist"]
+                        tot_errori_mov += dm["errori_gravi"]
 
-                        d_v, d_t = parse_frazione(duelli_m)
-                        tot_duelli_v += d_v
-                        tot_duelli_t += d_t
-                        lista_efficacia_passaggi.append(eff_pass_m)
-                        tot_perse += perse_m
-                        t_p, t_sp = parse_frazione(tiri_m)
-                        tot_tiri_p += t_p
-                        tot_tiri_sp += t_sp
-                        tot_gol += gol_m
-
-                        ruolo_match = d_p.get("ruolo_campo") or ruolo_default_da_rosa(
+                        ruolo_c = d_p.get("ruolo_campo") or ruolo_default_da_rosa(
                             db_giocatori.get(giocatore_sel, {}).get("ruolo", "")
                         )
+                        ruolo_match = f"{ruolo_c} ({get_etichetta_area(ruolo_c)})"
                         parametri_str = (
-                            f"Duelli: {duelli_m} | Passaggi: {eff_pass_m} | "
-                            f"Perse: {perse_m} | Tiri: {tiri_m} | Gol: {gol_m}"
+                            f"Impatto: {dm['impatto_partita']} | Palla/Duelli: {dm['gestione_palla']} | "
+                            f"Gol: {dm['gol_fatti']} | Assist: {dm['assist']} | Errori: {dm['errori_gravi']}"
                         )
 
                     tipo_presenza = "Titolare" if 1 <= num_maglia <= 11 else ("Subentro" if 12 <= num_maglia <= 20 else "Rosa")
@@ -1784,14 +1981,14 @@ elif menu == "📈 Riepilogo Squadra":
                         "Partita": p_nome,
                         "Data": p_val.get("data", "N.D."),
                         "Presenza": tipo_presenza,
-                        "Ruolo": ruolo_match,
+                        "Ruolo / Area": ruolo_match,
                         "Minuti": f"{min_giocati}'",
-                        "Parametri": parametri_str,
+                        "Valutazione": parametri_str,
                         "Voto": f"{voto_match} / 10" if voto_match is not None else "N.D. (0')"
                     })
 
     tot_presenze = presenze_titolare + presenze_subentro
-    media_stagione = round(sum(storico_voti)/len(storico_voti), 1) if storico_voti else None
+    media_stagione = round(sum(storico_voti) / len(storico_voti), 1) if storico_voti else None
     trend = calcola_trend_giocatore(storico_voti)
 
     c1, c2, c3 = st.columns(3)
@@ -1803,24 +2000,27 @@ elif menu == "📈 Riepilogo Squadra":
 
     st.markdown(f"""
     <div class="scoutai-box" style="margin-bottom: 18px;">
-        <h4 style="margin-top: 0; color: {accent_hex}; border-bottom: 1px solid {tema['border_color']}; padding-bottom: 10px;">🧮 Conteggio Totale Parametri Inseriti: {giocatore_sel}</h4>
+        <h4 style="margin-top: 0; color: {accent_hex}; border-bottom: 1px solid {tema['border_color']}; padding-bottom: 10px;">🧮 Sintesi Stagionale Snella: {giocatore_sel}</h4>
     """, unsafe_allow_html=True)
 
     if ha_dati_movimento:
-        valore_pass_metric = calcola_efficacia_passaggi_media(lista_efficacia_passaggi)
+        impatto_medio = calcola_media_giudizio(lista_impatti, OPZIONI_IMPATTO_PARTITA, SCALA_IMPATTO_PARTITA)
+        gestione_media = calcola_media_giudizio(lista_gestione, OPZIONI_GESTIONE_PALLA, SCALA_GESTIONE_PALLA)
 
         m1, m2, m3, m4, m5 = st.columns(5)
-        m1.metric("Duelli (V/T)", f"{tot_duelli_v}/{tot_duelli_t}")
-        m2.metric("Efficacia Passaggi", valore_pass_metric)
-        m3.metric("Palle Perse", tot_perse)
-        m4.metric("Tiri (P/Sp)", f"{tot_tiri_p}/{tot_tiri_sp}")
-        m5.metric("Gol Segnati", tot_gol)
+        m1.metric("Impatto Medio", impatto_medio)
+        m2.metric("Palla & Duelli", gestione_media)
+        m3.metric("Gol Segnati", tot_gol)
+        m4.metric("Assist", tot_assist)
+        m5.metric("Errori Gravi", tot_errori_mov)
 
     if ha_dati_portiere:
-        p1, p2, p3 = st.columns(3)
-        p1.metric("Parate Totali", tot_parate)
-        p2.metric("Uscite (Rius./Tent.)", f"{tot_uscite_v}/{tot_uscite_t}")
-        p3.metric("Gol Subiti / Respinti", f"{tot_gol_sub}/{tot_gol_resp}")
+        sicurezza_media = calcola_media_giudizio(lista_sicurezza_p, OPZIONI_SICUREZZA_PORTIERE, SCALA_SICUREZZA_PORTIERE)
+        p1, p2, p3, p4 = st.columns(4)
+        p1.metric("Sicurezza Media", sicurezza_media)
+        p2.metric("Parate Decisive", tot_parate_dec)
+        p3.metric("Gol Subiti", tot_gol_sub)
+        p4.metric("Errori Gravi", tot_errori_p)
 
     if not ha_dati_movimento and not ha_dati_portiere:
         st.info("Nessun parametro registrato per questo giocatore.")
@@ -1858,7 +2058,7 @@ elif menu == "📈 Riepilogo Squadra":
         st.info("Nessuna partita con dati registrati per questo giocatore.")
 
 # =====================================================================
-# 5. GRAFICI & ANALISI VISIVA
+# 5. GRAFICI & ANALISI VISIVA (ADATTATI AL MODELLO SNELLO)
 # =====================================================================
 elif menu == "📊 Grafici & Analisi Visiva":
     st.title("📊 Grafici & Analisi Visiva")
@@ -1924,7 +2124,7 @@ elif menu == "📊 Grafici & Analisi Visiva":
 
     st.divider()
 
-    st.subheader("📈 Andamento Voti & Parametri Giocatore")
+    st.subheader("📈 Andamento Voti & Eventi Chiave Giocatore")
     nomi_rosa = list(db_giocatori.keys()) if db_giocatori else []
     if not nomi_rosa:
         st.info("Aggiungi almeno un giocatore in Gestione Rosa per visualizzare i grafici individuali.")
@@ -1933,12 +2133,12 @@ elif menu == "📊 Grafici & Analisi Visiva":
     gioc_graf = st.selectbox("Seleziona Giocatore", nomi_rosa, key="sel_giocatore_grafici")
 
     righe_voti_gioc = []
-    tot_min_g = 0
     tot_gol_g = 0
-    tot_perse_g = 0
-    tot_duelli_v_g = 0
-    tot_tiri_p_g = 0
+    tot_assist_g = 0
+    tot_errori_g = 0
     tot_parate_g = 0
+    tot_gol_sub_g = 0
+    is_portiere_graf = False
 
     for idx_ord, (p_nome, p_val) in enumerate(partite_ordinate, start=1):
         formazione = p_val.get("formazione", {})
@@ -1951,7 +2151,6 @@ elif menu == "📊 Grafici & Analisi Visiva":
                 is_portiere = (str(n) in ["1", "12"])
 
                 if min_m > 0:
-                    tot_min_g += min_m
                     v_m = calcola_voto(d_p, is_portiere)
                     if v_m is not None:
                         righe_voti_gioc.append({
@@ -1961,15 +2160,17 @@ elif menu == "📊 Grafici & Analisi Visiva":
                             "Voto": v_m
                         })
 
-                if "parate" in d_p or "uscite" in d_p or "gol_subiti_resp" in d_p:
-                    tot_parate_g += int(d_p.get("parate", 0))
+                if is_portiere or "sicurezza_portiere" in d_p or "parate_decisive" in d_p or "parate" in d_p:
+                    is_portiere_graf = True
+                    dp = estrai_dati_portiere_compat(d_p)
+                    tot_parate_g += dp["parate_decisive"]
+                    tot_gol_sub_g += dp["gol_subiti"]
+                    tot_errori_g += dp["errori_gravi"]
                 else:
-                    d_v, _ = parse_frazione(d_p.get("duelli", "0/0"))
-                    t_p, _ = parse_frazione(d_p.get("tiri", "0/0"))
-                    tot_duelli_v_g += d_v
-                    tot_tiri_p_g += t_p
-                    tot_gol_g += int(d_p.get("gol_fatti", 0))
-                    tot_perse_g += int(d_p.get("perse", 0))
+                    dm = estrai_dati_movimento_compat(d_p)
+                    tot_gol_g += dm["gol_fatti"]
+                    tot_assist_g += dm["assist"]
+                    tot_errori_g += dm["errori_gravi"]
 
     col_g_sx, col_g_dx = st.columns(2)
 
@@ -1999,40 +2200,48 @@ elif menu == "📊 Grafici & Analisi Visiva":
             st.info("Nessuna partita votata (con minuti > 0) per questo giocatore.")
 
     with col_g_dx:
-        st.markdown(f"**Totali parametri accumulati ({gioc_graf})**")
-        if tot_parate_g > 0 or tot_duelli_v_g > 0 or tot_tiri_p_g > 0 or tot_gol_g > 0 or tot_perse_g > 0:
-            if tot_parate_g > 0 and tot_duelli_v_g == 0 and tot_gol_g == 0:
+        st.markdown(f"**Eventi chiave accumulati ({gioc_graf})**")
+        if is_portiere_graf:
+            if tot_parate_g > 0 or tot_gol_sub_g > 0 or tot_errori_g > 0:
                 df_param = pd.DataFrame({
-                    "Parametro": ["Parate", "Minuti (x10)"],
-                    "Valore": [tot_parate_g, round(tot_min_g / 10, 1)]
+                    "Evento": ["Parate Decisive", "Gol Subiti", "Errori Gravi"],
+                    "Totale": [tot_parate_g, tot_gol_sub_g, tot_errori_g]
                 })
+                st.bar_chart(df_param.set_index("Evento"), height=280)
             else:
-                df_param = pd.DataFrame({
-                    "Parametro": ["Duelli Vinti", "Tiri in Porta", "Gol Segnati", "Palle Perse"],
-                    "Valore": [tot_duelli_v_g, tot_tiri_p_g, tot_gol_g, tot_perse_g]
-                })
-            st.bar_chart(df_param.set_index("Parametro"), height=280)
+                st.info("Nessun evento registrato per questo portiere.")
         else:
-            st.info("Nessun parametro statistico registrato per questo giocatore.")
+            if tot_gol_g > 0 or tot_assist_g > 0 or tot_errori_g > 0:
+                df_param = pd.DataFrame({
+                    "Evento": ["Gol Segnati", "Assist", "Errori Gravi"],
+                    "Totale": [tot_gol_g, tot_assist_g, tot_errori_g]
+                })
+                st.bar_chart(df_param.set_index("Evento"), height=280)
+            else:
+                st.info("Nessun evento chiave (gol, assist o errori) registrato.")
 
     st.divider()
 
-    st.subheader("👥 Confronto Rosa: Minuti Giocati & Gol Segnati")
+    st.subheader("👥 Confronto Rosa: Minuti Giocati & Gol + Assist")
     righe_rosa_graf = []
     for nome_r in nomi_rosa:
         min_r = 0
         gol_r = 0
+        assist_r = 0
         for _, p_val in partite_ordinate:
             for _, g_in_form in p_val.get("formazione", {}).items():
                 if g_in_form == nome_r:
                     d_p = p_val.get("dati_prestazione", {}).get(nome_r, {})
                     if d_p:
                         min_r += int(d_p.get("minuti", 0))
-                        gol_r += int(d_p.get("gol_fatti", 0))
+                        dm = estrai_dati_movimento_compat(d_p)
+                        gol_r += dm["gol_fatti"]
+                        assist_r += dm["assist"]
         righe_rosa_graf.append({
             "Giocatore": nome_r,
             "Minuti Giocati": min_r,
-            "Gol Segnati": gol_r
+            "Gol": gol_r,
+            "Assist": assist_r,
         })
 
     if righe_rosa_graf:
@@ -2042,8 +2251,8 @@ elif menu == "📊 Grafici & Analisi Visiva":
             st.markdown("**Minuti giocati in stagione**")
             st.bar_chart(df_rosa_g.set_index("Giocatore")[["Minuti Giocati"]], height=280)
         with c_r2:
-            st.markdown("**Gol segnati in stagione**")
-            st.bar_chart(df_rosa_g.sort_values("Gol Segnati", ascending=False).set_index("Giocatore")[["Gol Segnati"]], height=280)
+            st.markdown("**Gol e Assist in stagione**")
+            st.bar_chart(df_rosa_g.sort_values(["Gol", "Assist"], ascending=False).set_index("Giocatore")[["Gol", "Assist"]], height=280)
 
 # =====================================================================
 # 6. GESTIONE ROSA
@@ -2085,7 +2294,7 @@ elif menu == "👤 Gestione Rosa":
                     break
                 except Exception:
                     continue
-            
+
             if df_upload is not None:
                 if "Nome" in df_upload.columns and "Ruolo" in df_upload.columns:
                     st.success(f"File CSV letto con successo! Trovati {len(df_upload)} record.")
