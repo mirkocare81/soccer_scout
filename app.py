@@ -1854,6 +1854,20 @@ elif menu == "🎥 Video Analisi":
 elif menu == "📈 Riepilogo Squadra":
     st.title("📈 Riepilogo Squadra & Statistiche Stagionali")
 
+    def render_metric_box(titolo, valore_testo):
+        st.markdown(f"""
+        <div style="
+            background-color: {tema['bg_card']};
+            border: 1px solid {glow_border_rgba};
+            border-radius: {radius_px}px;
+            padding: 18px;
+            box-shadow: {box_shadow_glow};
+        ">
+            <div style="font-size: 14px; color: #a0aec0; margin-bottom: 6px;">{titolo}</div>
+            <div style="font-size: 28px; font-weight: 700; color: {accent_hex}; line-height: 1.15;">{valore_testo}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
     st.subheader("🏆 Elenco Partite & Rendimento per Reparto")
 
     partite_ordinate = sorted(
@@ -1863,6 +1877,7 @@ elif menu == "📈 Riepilogo Squadra":
 
     partite_riepilogo = []
     voti_reparti_stagione = {"Difesa": [], "Centrocampo": [], "Attacco": []}
+    serie_globale_match = []
 
     for p_nome, p_val in partite_ordinate:
         voti_match = []
@@ -1901,6 +1916,9 @@ elif menu == "📈 Riepilogo Squadra":
         media_cen = round(sum(voti_rep_match["Centrocampo"]) / len(voti_rep_match["Centrocampo"]), 1) if voti_rep_match["Centrocampo"] else None
         media_att = round(sum(voti_rep_match["Attacco"]) / len(voti_rep_match["Attacco"]), 1) if voti_rep_match["Attacco"] else None
 
+        if voto_medio is not None:
+            serie_globale_match.append(voto_medio)
+
         partite_riepilogo.append({
             "Partita": p_nome,
             "Data": p_val["data"],
@@ -1913,16 +1931,34 @@ elif menu == "📈 Riepilogo Squadra":
             "Media Squadra": f"{voto_medio} / 10" if voto_medio is not None else "N.D."
         })
 
-    col_rep1, col_rep2, col_rep3 = st.columns(3)
+    m_sq_stag = round(sum(serie_globale_match) / len(serie_globale_match), 1) if serie_globale_match else None
     m_stag_dif = round(sum(voti_reparti_stagione["Difesa"]) / len(voti_reparti_stagione["Difesa"]), 1) if voti_reparti_stagione["Difesa"] else None
     m_stag_cen = round(sum(voti_reparti_stagione["Centrocampo"]) / len(voti_reparti_stagione["Centrocampo"]), 1) if voti_reparti_stagione["Centrocampo"] else None
     m_stag_att = round(sum(voti_reparti_stagione["Attacco"]) / len(voti_reparti_stagione["Attacco"]), 1) if voti_reparti_stagione["Attacco"] else None
 
-    col_rep1.metric("🛡️ Media Reparto Difesa", f"{m_stag_dif} / 10" if m_stag_dif is not None else "N.D.")
-    col_rep2.metric("⚙️ Media Reparto Centrocampo", f"{m_stag_cen} / 10" if m_stag_cen is not None else "N.D.")
-    col_rep3.metric("⚡ Media Reparto Attacco", f"{m_stag_att} / 10" if m_stag_att is not None else "N.D.")
+    col_sq_stag, col_rep1, col_rep2, col_rep3 = st.columns(4)
+    with col_sq_stag:
+        render_metric_box(
+            "🏅 Voto Medio Squadra Stagionale",
+            f"{m_sq_stag} / 10" if m_sq_stag is not None else "N.D."
+        )
+    with col_rep1:
+        render_metric_box(
+            "🛡️ Media Reparto Difesa",
+            f"{m_stag_dif} / 10" if m_stag_dif is not None else "N.D."
+        )
+    with col_rep2:
+        render_metric_box(
+            "⚙️ Media Reparto Centrocampo",
+            f"{m_stag_cen} / 10" if m_stag_cen is not None else "N.D."
+        )
+    with col_rep3:
+        render_metric_box(
+            "⚡ Media Reparto Attacco",
+            f"{m_stag_att} / 10" if m_stag_att is not None else "N.D."
+        )
 
-    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
     if partite_riepilogo:
         st.table(pd.DataFrame(partite_riepilogo))
