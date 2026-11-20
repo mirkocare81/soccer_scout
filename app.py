@@ -1854,34 +1854,6 @@ elif menu == "🎥 Video Analisi":
 elif menu == "📈 Riepilogo Squadra":
     st.title("📈 Riepilogo Squadra & Statistiche Stagionali")
 
-    def icona_andamento_voto(valore_attuale, valore_precedente):
-        """Restituisce HTML con sola icona (senza testo): freccia verde su, linea gialla stabile, freccia rossa giù."""
-        if valore_attuale is None or valore_precedente is None:
-            return ""
-        diff = round(float(valore_attuale) - float(valore_precedente), 2)
-        if diff > 0:
-            return "<span style='color:#22c55e;font-weight:700;font-size:15px;line-height:1;'>▲</span>"
-        if diff < 0:
-            return "<span style='color:#ef4444;font-weight:700;font-size:15px;line-height:1;'>▼</span>"
-        return "<span style='color:#eab308;font-weight:700;font-size:15px;line-height:1;'>▬</span>"
-
-    def render_metric_con_icona(titolo, valore_testo, icona_html):
-        st.markdown(f"""
-        <div style="
-            background-color: {tema['bg_card']};
-            border: 1px solid {glow_border_rgba};
-            border-radius: {radius_px}px;
-            padding: 18px;
-            box-shadow: {box_shadow_glow};
-        ">
-            <div style="font-size: 14px; color: #a0aec0; margin-bottom: 6px;">{titolo}</div>
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 28px; font-weight: 700; color: {accent_hex}; line-height: 1.15;">{valore_testo}</span>
-                {icona_html}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
     st.subheader("🏆 Elenco Partite & Rendimento per Reparto")
 
     partite_ordinate = sorted(
@@ -1891,12 +1863,6 @@ elif menu == "📈 Riepilogo Squadra":
 
     partite_riepilogo = []
     voti_reparti_stagione = {"Difesa": [], "Centrocampo": [], "Attacco": []}
-    voti_globali_stagione = []
-
-    serie_globale_match = []
-    serie_dif_match = []
-    serie_cen_match = []
-    serie_att_match = []
 
     for p_nome, p_val in partite_ordinate:
         voti_match = []
@@ -1914,7 +1880,6 @@ elif menu == "📈 Riepilogo Squadra":
                 v_g = calcola_voto(d_p, is_portiere)
                 if v_g is not None:
                     voti_match.append(v_g)
-                    voti_globali_stagione.append(v_g)
                     if is_portiere:
                         dp = estrai_dati_portiere_compat(d_p)
                         errori_match += dp["errori_gravi"]
@@ -1936,77 +1901,31 @@ elif menu == "📈 Riepilogo Squadra":
         media_cen = round(sum(voti_rep_match["Centrocampo"]) / len(voti_rep_match["Centrocampo"]), 1) if voti_rep_match["Centrocampo"] else None
         media_att = round(sum(voti_rep_match["Attacco"]) / len(voti_rep_match["Attacco"]), 1) if voti_rep_match["Attacco"] else None
 
-        prev_glob = serie_globale_match[-1] if serie_globale_match else None
-        prev_dif = serie_dif_match[-1] if serie_dif_match else None
-        prev_cen = serie_cen_match[-1] if serie_cen_match else None
-        prev_att = serie_att_match[-1] if serie_att_match else None
-
-        if voto_medio is not None:
-            serie_globale_match.append(voto_medio)
-        if media_dif is not None:
-            serie_dif_match.append(media_dif)
-        if media_cen is not None:
-            serie_cen_match.append(media_cen)
-        if media_att is not None:
-            serie_att_match.append(media_att)
-
-        icona_dif_cell = f" {icona_andamento_voto(media_dif, prev_dif)}" if media_dif is not None and prev_dif is not None else ""
-        icona_cen_cell = f" {icona_andamento_voto(media_cen, prev_cen)}" if media_cen is not None and prev_cen is not None else ""
-        icona_att_cell = f" {icona_andamento_voto(media_att, prev_att)}" if media_att is not None and prev_att is not None else ""
-        icona_sq_cell = f" {icona_andamento_voto(voto_medio, prev_glob)}" if voto_medio is not None and prev_glob is not None else ""
-
         partite_riepilogo.append({
             "Partita": p_nome,
             "Data": p_val["data"],
             "Risultato": p_val.get("risultato", "N.D."),
             "Luogo": p_val.get("casa_trasferta", "Casa"),
             "Gol / Ass / Err": f"{gol_match} / {assist_match} / {errori_match}",
-            "Difesa": (f"{media_dif}{icona_dif_cell}" if media_dif is not None else "-"),
-            "Centrocampo": (f"{media_cen}{icona_cen_cell}" if media_cen is not None else "-"),
-            "Attacco": (f"{media_att}{icona_att_cell}" if media_att is not None else "-"),
-            "Media Squadra": (f"{voto_medio} / 10{icona_sq_cell}" if voto_medio is not None else "N.D.")
+            "Difesa": f"{media_dif}" if media_dif is not None else "-",
+            "Centrocampo": f"{media_cen}" if media_cen is not None else "-",
+            "Attacco": f"{media_att}" if media_att is not None else "-",
+            "Media Squadra": f"{voto_medio} / 10" if voto_medio is not None else "N.D."
         })
 
-    m_glob_stag = round(sum(voti_globali_stagione) / len(voti_globali_stagione), 1) if voti_globali_stagione else None
+    col_rep1, col_rep2, col_rep3 = st.columns(3)
     m_stag_dif = round(sum(voti_reparti_stagione["Difesa"]) / len(voti_reparti_stagione["Difesa"]), 1) if voti_reparti_stagione["Difesa"] else None
     m_stag_cen = round(sum(voti_reparti_stagione["Centrocampo"]) / len(voti_reparti_stagione["Centrocampo"]), 1) if voti_reparti_stagione["Centrocampo"] else None
     m_stag_att = round(sum(voti_reparti_stagione["Attacco"]) / len(voti_reparti_stagione["Attacco"]), 1) if voti_reparti_stagione["Attacco"] else None
 
-    icona_glob = icona_andamento_voto(serie_globale_match[-1], serie_globale_match[-2]) if len(serie_globale_match) >= 2 else ""
-    icona_dif = icona_andamento_voto(serie_dif_match[-1], serie_dif_match[-2]) if len(serie_dif_match) >= 2 else ""
-    icona_cen = icona_andamento_voto(serie_cen_match[-1], serie_cen_match[-2]) if len(serie_cen_match) >= 2 else ""
-    icona_att = icona_andamento_voto(serie_att_match[-1], serie_att_match[-2]) if len(serie_att_match) >= 2 else ""
+    col_rep1.metric("🛡️ Media Reparto Difesa", f"{m_stag_dif} / 10" if m_stag_dif is not None else "N.D.")
+    col_rep2.metric("⚙️ Media Reparto Centrocampo", f"{m_stag_cen} / 10" if m_stag_cen is not None else "N.D.")
+    col_rep3.metric("⚡ Media Reparto Attacco", f"{m_stag_att} / 10" if m_stag_att is not None else "N.D.")
 
-    col_glob, col_rep1, col_rep2, col_rep3 = st.columns(4)
-    with col_glob:
-        render_metric_con_icona(
-            "🌐 Voto Medio Globale",
-            f"{m_glob_stag} / 10" if m_glob_stag is not None else "N.D.",
-            icona_glob
-        )
-    with col_rep1:
-        render_metric_con_icona(
-            "🛡️ Media Reparto Difesa",
-            f"{m_stag_dif} / 10" if m_stag_dif is not None else "N.D.",
-            icona_dif
-        )
-    with col_rep2:
-        render_metric_con_icona(
-            "⚙️ Media Reparto Centrocampo",
-            f"{m_stag_cen} / 10" if m_stag_cen is not None else "N.D.",
-            icona_cen
-        )
-    with col_rep3:
-        render_metric_con_icona(
-            "⚡ Media Reparto Attacco",
-            f"{m_stag_att} / 10" if m_stag_att is not None else "N.D.",
-            icona_att
-        )
-
-    st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
 
     if partite_riepilogo:
-        st.markdown(pd.DataFrame(partite_riepilogo).to_html(index=False, escape=False), unsafe_allow_html=True)
+        st.table(pd.DataFrame(partite_riepilogo))
 
     st.divider()
     st.subheader("📊 Riepilogo Stagionale Giocatore")
@@ -2062,11 +1981,7 @@ elif menu == "📈 Riepilogo Squadra":
                     ha_minuti = min_giocati > 0
                     voto_match = calcola_voto(d_p, is_portiere) if ha_minuti else None
 
-                    icona_voto_cell = ""
                     if ha_minuti and voto_match is not None:
-                        prev_voto_g = storico_voti[-1] if storico_voti else None
-                        if prev_voto_g is not None:
-                            icona_voto_cell = f" {icona_andamento_voto(voto_match, prev_voto_g)}"
                         storico_voti.append(voto_match)
                         tot_minuti += min_giocati
 
@@ -2116,28 +2031,17 @@ elif menu == "📈 Riepilogo Squadra":
                         "Ruolo / Area": ruolo_match,
                         "Minuti": f"{min_giocati}'",
                         "Valutazione": parametri_str,
-                        "Voto": (f"{voto_match} / 10{icona_voto_cell}" if voto_match is not None else "N.D. (0')")
+                        "Voto": f"{voto_match} / 10" if voto_match is not None else "N.D. (0')"
                     })
 
     tot_presenze = presenze_titolare + presenze_subentro
     media_stagione = round(sum(storico_voti) / len(storico_voti), 1) if storico_voti else None
-    icona_media_gioc = icona_andamento_voto(storico_voti[-1], storico_voti[-2]) if len(storico_voti) >= 2 else ""
+    trend = calcola_trend_giocatore(storico_voti)
 
     c1, c2, c3 = st.columns(3)
-    with c1:
-        st.metric("Partite Votate", len(storico_voti))
-    with c2:
-        render_metric_con_icona(
-            "Media Voto Stagionale",
-            f"{media_stagione} / 10" if media_stagione is not None else "N.D.",
-            icona_media_gioc
-        )
-    with c3:
-        render_metric_con_icona(
-            "Andamento Ultimo Match",
-            f"{storico_voti[-1]} / 10" if storico_voti else "N.D.",
-            icona_media_gioc
-        )
+    c1.metric("Partite Votate", len(storico_voti))
+    c2.metric("Media Voto Stagionale", f"{media_stagione} / 10" if media_stagione is not None else "N.D.")
+    c3.metric("Trend di Rendimento", trend)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -2196,7 +2100,7 @@ elif menu == "📈 Riepilogo Squadra":
 
     st.markdown(f"#### 🗓️ Dettaglio Partita per Partita: {giocatore_sel}")
     if righe_match_giocatore:
-        st.markdown(pd.DataFrame(righe_match_giocatore).to_html(index=False, escape=False), unsafe_allow_html=True)
+        st.table(pd.DataFrame(righe_match_giocatore))
     else:
         st.info("Nessuna partita con dati registrati per questo giocatore.")
 
