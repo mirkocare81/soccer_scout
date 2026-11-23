@@ -1510,12 +1510,16 @@ def genera_svg_lavagna_tattica(modulo, nodi_campo, accent_hex, bg_card_hex):
 
     cerchi_svg = []
     for idx, pos in enumerate(layout):
-        nodo = nodi_campo[idx] if idx < len(nodi_campo) else {"maglia": str(idx + 1), "nome": "-", "ruolo": pos["ruolo"], "voto": None}
+        nodo = (
+            nodi_campo[idx]
+            if idx < len(nodi_campo)
+            else {"maglia": str(idx + 1), "nome": "-", "ruolo": pos["ruolo"], "voto": None}
+        )
         cx = 40 + (pos["x"] / 100.0) * 520
         cy = 48 + (pos["y"] / 100.0) * 764
         maglia = str(nodo.get("maglia", idx + 1))
         nome_raw = str(nodo.get("nome") or "-")
-        nome_short = nome_raw if len(nome_raw) <= 13 else (nome_raw[:12] + "…")
+        nome_short = nome_raw if len(nome_raw) <= 14 else (nome_raw[:13] + "…")
         ruolo_tag = str(nodo.get("ruolo") or pos["ruolo"])
         voto_val = nodo.get("voto")
         is_por = (ruolo_tag == "POR" or maglia == "1")
@@ -1593,7 +1597,6 @@ def genera_svg_lavagna_tattica(modulo, nodi_campo, accent_hex, bg_card_hex):
         </svg>
     </div>
     """
-
 # =====================================================================
 # SIDEBAR, LOGIN ADMIN, PERSISTENZA SELEZIONE PARTITA & NAVIGAZIONE
 # =====================================================================
