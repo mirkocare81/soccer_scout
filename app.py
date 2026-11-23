@@ -215,7 +215,10 @@ def calcola_media_giudizio(valori, opzioni, scala):
     """Restituisce l'etichetta media su scala ordinata."""
     if not valori:
         return "N.D."
-    media_val = sum(scala[v] for v in valori if v in scala) / len(vori)
+    valori_validi = [scala[v] for v in valori if v in scala]
+    if not valori_validi:
+        return "N.D."
+    media_val = sum(valori_validi) / len(valori_validi)
     return min(opzioni, key=lambda k: abs(scala[k] - media_val))
 
 def get_macro_ruolo(ruolo_specifico):
