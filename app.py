@@ -89,6 +89,70 @@ SCALA_SICUREZZA_PORTIERE = {
     "Insicuro": -2.0,
 }
 
+# Coordinate percentuali sul campo (x: 0=sinistra, 100=destra; y: 0=attacco alto, 100=porta propria basso)
+COORDINATE_MODULI = {
+    "4-3-3": [
+        {"slot": "1",  "ruolo": "POR", "x": 50, "y": 90},
+        {"slot": "2",  "ruolo": "TD",  "x": 84, "y": 73},
+        {"slot": "3",  "ruolo": "TS",  "x": 16, "y": 73},
+        {"slot": "4",  "ruolo": "DC",  "x": 63, "y": 76},
+        {"slot": "5",  "ruolo": "DC",  "x": 37, "y": 76},
+        {"slot": "6",  "ruolo": "CDC", "x": 50, "y": 57},
+        {"slot": "8",  "ruolo": "CC",  "x": 70, "y": 47},
+        {"slot": "10", "ruolo": "CC",  "x": 30, "y": 47},
+        {"slot": "7",  "ruolo": "AD",  "x": 82, "y": 24},
+        {"slot": "9",  "ruolo": "AT",  "x": 50, "y": 17},
+        {"slot": "11", "ruolo": "AS",  "x": 18, "y": 24},
+    ],
+    "4-4-2": [
+        {"slot": "1",  "ruolo": "POR", "x": 50, "y": 90},
+        {"slot": "2",  "ruolo": "TD",  "x": 84, "y": 73},
+        {"slot": "3",  "ruolo": "TS",  "x": 16, "y": 73},
+        {"slot": "4",  "ruolo": "DC",  "x": 63, "y": 76},
+        {"slot": "5",  "ruolo": "DC",  "x": 37, "y": 76},
+        {"slot": "7",  "ruolo": "AD",  "x": 84, "y": 46},
+        {"slot": "4_c","ruolo": "CC",  "x": 62, "y": 50, "maglia_fallback": "6"},
+        {"slot": "8",  "ruolo": "CC",  "x": 38, "y": 50},
+        {"slot": "11", "ruolo": "AS",  "x": 16, "y": 46},
+        {"slot": "9",  "ruolo": "AT",  "x": 62, "y": 21},
+        {"slot": "10", "ruolo": "AT",  "x": 38, "y": 21},
+    ],
+    "3-5-2": [
+        {"slot": "1",  "ruolo": "POR", "x": 50, "y": 90},
+        {"slot": "2",  "ruolo": "DC",  "x": 74, "y": 75},
+        {"slot": "5",  "ruolo": "DC",  "x": 50, "y": 77},
+        {"slot": "3",  "ruolo": "DC",  "x": 26, "y": 75},
+        {"slot": "7",  "ruolo": "TD",  "x": 87, "y": 50},
+        {"slot": "6",  "ruolo": "CDC", "x": 50, "y": 58},
+        {"slot": "4",  "ruolo": "CC",  "x": 68, "y": 46},
+        {"slot": "8",  "ruolo": "CC",  "x": 32, "y": 46},
+        {"slot": "11", "ruolo": "TS",  "x": 13, "y": 50},
+        {"slot": "9",  "ruolo": "AT",  "x": 62, "y": 21},
+        {"slot": "10", "ruolo": "AT",  "x": 38, "y": 21},
+    ],
+    "4-2-3-1": [
+        {"slot": "1",  "ruolo": "POR", "x": 50, "y": 90},
+        {"slot": "2",  "ruolo": "TD",  "x": 84, "y": 73},
+        {"slot": "3",  "ruolo": "TS",  "x": 16, "y": 73},
+        {"slot": "4",  "ruolo": "DC",  "x": 63, "y": 76},
+        {"slot": "5",  "ruolo": "DC",  "x": 37, "y": 76},
+        {"slot": "6",  "ruolo": "CDC", "x": 63, "y": 57},
+        {"slot": "8",  "ruolo": "CDC", "x": 37, "y": 57},
+        {"slot": "7",  "ruolo": "AD",  "x": 82, "y": 36},
+        {"slot": "10", "ruolo": "TQ",  "x": 50, "y": 38},
+        {"slot": "11", "ruolo": "AS",  "x": 18, "y": 36},
+        {"slot": "9",  "ruolo": "AT",  "x": 50, "y": 17},
+    ],
+}
+
+STILI_TATTICI_OPZIONI = [
+    "4-3-3 Gegenpressing & Verticalità",
+    "Costruzione dal basso & Ampiezza",
+    "Blocco medio-alto & Riaggressione",
+    "Difesa compatta & Contropiede rapido",
+    "Possesso paziente & Rotazioni",
+]
+
 # Pesi per area di gioco (Difesa, Centrocampo, Attacco)
 PESI_AREA_GIOCO = {
     "DIFENSORE": {
@@ -116,9 +180,11 @@ PESI_AREA_GIOCO = {
 
 TUTTE_LE_SCHEDE_APP = [
     "📋 Setup Partite & Formazioni",
+    "🧲 Lavagna Tattica",
     "⚡ Inserimento Parametri & Voti",
     "🎥 Video Analisi",
     "📈 Riepilogo Squadra",
+    "⚖️ Confronto Giocatori",
     "📊 Grafici & Analisi Visiva",
     "🟨 Fair Play",
     "👤 Gestione Rosa",
@@ -230,27 +296,6 @@ def estrai_fairplay_compat(d_p):
     esp = bool(d_p.get("espulso", d_p.get("espulsione", False)))
     return {"ammonito": amm, "espulso": esp}
 
-def render_indicatori_fairplay_html(ammonito, espulso):
-    """Restituisce il markup HTML dei puntini gialli/rossi per ammonizioni ed espulsioni."""
-    badges = []
-    if ammonito:
-        badges.append(
-            "<span title='Ammonito' style='display:inline-flex;align-items:center;gap:5px;"
-            "margin-left:8px;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;"
-            "background:rgba(234,179,8,0.16);border:1px solid rgba(234,179,8,0.65);color:#facc15;'>"
-            "<span style='width:8px;height:8px;border-radius:50%;background:#eab308;"
-            "box-shadow:0 0 6px #eab308;display:inline-block;'></span>AMM</span>"
-        )
-    if espulso:
-        badges.append(
-            "<span title='Espulso (-1 voto)' style='display:inline-flex;align-items:center;gap:5px;"
-            "margin-left:6px;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;"
-            "background:rgba(239,68,68,0.18);border:1px solid rgba(239,68,68,0.75);color:#f87171;'>"
-            "<span style='width:8px;height:8px;border-radius:50%;background:#ef4444;"
-            "box-shadow:0 0 7px #ef4444;display:inline-block;'></span>ESP -1</span>"
-        )
-    return "".join(badges)
-
 def get_macro_ruolo(ruolo_specifico):
     if ruolo_specifico in RUOLI_DIFENSORI:
         return "DIFENSORE"
@@ -265,6 +310,8 @@ def get_etichetta_area(ruolo_specifico):
 
 def ruolo_default_da_rosa(ruolo_rosa_str):
     r = (ruolo_rosa_str or "").upper()
+    if "POR" in r:
+        return "POR"
     if "TERZINO" in r or "TS" in r or "TD" in r:
         return "TD" if "TD" in r else "TS"
     if "DIFENSORE" in r or "DC" in r:
@@ -331,8 +378,11 @@ def valori_base_giocatore(nome_g, is_portiere, is_riserva, db_giocatori):
             "ammonito": False,
             "espulso": False,
         }
+    ruolo_def = ruolo_default_da_rosa(db_giocatori.get(nome_g, {}).get("ruolo", ""))
+    if ruolo_def == "POR":
+        ruolo_def = "CC"
     return {
-        "ruolo_campo": ruolo_default_da_rosa(db_giocatori.get(nome_g, {}).get("ruolo", "")),
+        "ruolo_campo": ruolo_def,
         "minuti": min_default,
         "impatto_partita": "Ordinato",
         "gestione_palla": "Pulita",
@@ -497,15 +547,17 @@ def applica_payload_database(payload):
         st.session_state["ui_theme"] = merged_theme
 
     if "fullscreen_mode" in payload:
-        st.session_state["fullscreen_mode"] = bool(payload.get("fullscreen_mode", False))
+        st.session_state["fullscreen_mode"] = bool(payload["fullscreen_mode", False])
 
     if isinstance(payload.get("auth_config"), dict) and payload["auth_config"]:
         cfg_imp = payload["auth_config"].copy()
         cfg_imp.setdefault("admin_pin_hash", _hash_pin("1234"))
         cfg_imp.setdefault("read_only_boys", True)
         cfg_imp.setdefault("sezioni_ragazzi", [
+            "🧲 Lavagna Tattica",
             "🎥 Video Analisi",
             "📈 Riepilogo Squadra",
+            "⚖️ Confronto Giocatori",
             "📊 Grafici & Analisi Visiva",
             "🟨 Fair Play",
         ])
@@ -645,8 +697,10 @@ def inizializza_sicurezza_ruoli(dati_salvati):
             "admin_pin_hash": cfg_salvata.get("admin_pin_hash") or _hash_pin("1234"),
             "read_only_boys": bool(cfg_salvata.get("read_only_boys", True)),
             "sezioni_ragazzi": cfg_salvata.get("sezioni_ragazzi") or [
+                "🧲 Lavagna Tattica",
                 "🎥 Video Analisi",
                 "📈 Riepilogo Squadra",
+                "⚖️ Confronto Giocatori",
                 "📊 Grafici & Analisi Visiva",
                 "🟨 Fair Play",
             ],
@@ -820,7 +874,9 @@ else:
                 "avversario": "Virtus", "data": "15/03/2026", "modulo": "4-4-2",
                 "risultato": "N.D.", "casa_trasferta": "Casa", "youtube_link": "",
                 "formazione": {str(i): (list(st.session_state["database_giocatori"].keys())[i-1] if i <= len(st.session_state["database_giocatori"]) else "") for i in range(1, 21)},
-                "dati_prestazione": {}
+                "dati_prestazione": {},
+                "note_tattiche": "",
+                "stile_tattico": STILI_TATTICI_OPZIONI[0],
             }
         }
     if "partita_attiva" not in st.session_state:
@@ -1205,6 +1261,118 @@ def calcola_trend_giocatore(storico_voti):
         return f"In Decrescita 📉 ({diff})"
     return "Stabile (↔️)"
 
+def calcola_statistiche_stagionali_giocatore(nome_giocatore, db_partite, db_giocatori):
+    """Calcola il profilo completo stagionale e partita per partita di un singolo giocatore."""
+    partite_ord = sorted(
+        db_partite.items(),
+        key=lambda item: parse_data_partita(item[1].get("data", "01/01/2026"))
+    )
+
+    storico_voti = []
+    serie_match = []
+    tot_minuti = 0
+    pres_tit = 0
+    pres_sub = 0
+    tot_gol = 0
+    tot_assist = 0
+    tot_errori = 0
+    tot_parate = 0
+    tot_gol_sub = 0
+    tot_amm = 0
+    tot_esp = 0
+    lista_imp = []
+    lista_ges = []
+    lista_sic = []
+    ruoli_usati = {}
+    is_por_prevalente = "POR" in (db_giocatori.get(nome_giocatore, {}).get("ruolo", "").upper())
+
+    for idx_ord, (p_nome, p_val) in enumerate(partite_ord, start=1):
+        formazione = p_val.get("formazione", {})
+        for n, nome in formazione.items():
+            if nome != nome_giocatore:
+                continue
+            d_p = p_val.get("dati_prestazione", {}).get(nome_giocatore, {})
+            if not d_p:
+                continue
+
+            min_g = int(d_p.get("minuti", 0))
+            num_maglia = int(n) if str(n).isdigit() else 0
+            is_portiere = (str(n) in ["1", "12"])
+            if is_portiere:
+                is_por_prevalente = True
+
+            fp = estrai_fairplay_compat(d_p)
+            if fp["ammonito"]:
+                tot_amm += 1
+            if fp["espulso"]:
+                tot_esp += 1
+
+            voto_m = calcola_voto(d_p, is_portiere) if min_g > 0 else None
+            if min_g > 0 and voto_m is not None:
+                storico_voti.append(voto_m)
+                tot_minuti += min_g
+                if 1 <= num_maglia <= 11:
+                    pres_tit += 1
+                elif 12 <= num_maglia <= 20:
+                    pres_sub += 1
+                serie_match.append({
+                    "Ordine": idx_ord,
+                    "Partita": p_nome,
+                    "Data": p_val.get("data", "N.D."),
+                    "Minuti": min_g,
+                    "Voto": voto_m,
+                })
+
+            if is_portiere or "sicurezza_portiere" in d_p or "parate_decisive" in d_p:
+                dp = estrai_dati_portiere_compat(d_p)
+                if min_g > 0:
+                    lista_sic.append(dp["sicurezza_portiere"])
+                tot_parate += dp["parate_decisive"]
+                tot_gol_sub += dp["gol_subiti"]
+                tot_errori += dp["errori_gravi"]
+                ruoli_usati["POR"] = ruoli_usati.get("POR", 0) + 1
+            else:
+                dm = estrai_dati_movimento_compat(d_p)
+                if min_g > 0:
+                    lista_imp.append(dm["impatto_partita"])
+                    lista_ges.append(dm["gestione_palla"])
+                tot_gol += dm["gol_fatti"]
+                tot_assist += dm["assist"]
+                tot_errori += dm["errori_gravi"]
+                rc = d_p.get("ruolo_campo") or ruolo_default_da_rosa(db_giocatori.get(nome_giocatore, {}).get("ruolo", ""))
+                ruoli_usati[rc] = ruoli_usati.get(rc, 0) + 1
+
+    media_voto = round(sum(storico_voti) / len(storico_voti), 2) if storico_voti else None
+    best_voto = max(storico_voti) if storico_voti else None
+    ruolo_freq = max(ruoli_usati.items(), key=lambda x: x[1])[0] if ruoli_usati else ruolo_default_da_rosa(
+        db_giocatori.get(nome_giocatore, {}).get("ruolo", "")
+    )
+
+    return {
+        "nome": nome_giocatore,
+        "ruolo_rosa": db_giocatori.get(nome_giocatore, {}).get("ruolo", "-"),
+        "ruolo_prevalente": ruolo_freq,
+        "is_portiere": is_por_prevalente,
+        "presenze": pres_tit + pres_sub,
+        "titolari": pres_tit,
+        "subentri": pres_sub,
+        "minuti": tot_minuti,
+        "media_voto": media_voto,
+        "best_voto": best_voto,
+        "trend": calcola_trend_giocatore(storico_voti),
+        "gol": tot_gol,
+        "assist": tot_assist,
+        "errori": tot_errori,
+        "parate": tot_parate,
+        "gol_subiti": tot_gol_sub,
+        "ammonizioni": tot_amm,
+        "espulsioni": tot_esp,
+        "impatto_medio": calcola_media_giudizio(lista_imp, OPZIONI_IMPATTO_PARTITA, SCALA_IMPATTO_PARTITA),
+        "gestione_media": calcola_media_giudizio(lista_ges, OPZIONI_GESTIONE_PALLA, SCALA_GESTIONE_PALLA),
+        "sicurezza_media": calcola_media_giudizio(lista_sic, OPZIONI_SICUREZZA_PORTIERE, SCALA_SICUREZZA_PORTIERE),
+        "serie_match": serie_match,
+    }
+
 # =====================================================================
 # GENERATORE PDF (OPZIONALE SE REPORTLAB È DISPONIBILE)
 # =====================================================================
@@ -1333,6 +1501,100 @@ def genera_pdf_partita(match_name, match_data, db_giocatori, accent_hex):
     return filename
 
 # =====================================================================
+# RENDER SVG LAVAGNA TATTICA
+# =====================================================================
+def genera_svg_lavagna_tattica(modulo, nodi_campo, accent_hex, bg_card_hex):
+    """Genera un campo da calcio verticale in SVG con i giocatori posizionati per ruolo."""
+    modulo_use = modulo if modulo in COORDINATE_MODULI else "4-3-3"
+    layout = COORDINATE_MODULI[modulo_use]
+
+    cerchi_svg = []
+    for idx, pos in enumerate(layout):
+        nodo = nodi_campo[idx] if idx < len(nodi_campo) else {"maglia": str(idx + 1), "nome": "-", "ruolo": pos["ruolo"], "voto": None}
+        cx = 40 + (pos["x"] / 100.0) * 520
+        cy = 48 + (pos["y"] / 100.0) * 764
+        maglia = str(nodo.get("maglia", idx + 1))
+        nome_raw = str(nodo.get("nome") or "-")
+        nome_short = nome_raw if len(nome_raw) <= 13 else (nome_raw[:12] + "…")
+        ruolo_tag = str(nodo.get("ruolo") or pos["ruolo"])
+        voto_val = nodo.get("voto")
+        is_por = (ruolo_tag == "POR" or maglia == "1")
+
+        fill_maglia = "#f59e0b" if is_por else accent_hex
+        stroke_maglia = "#ffffff"
+        badge_voto = ""
+        if voto_val is not None:
+            badge_voto = f"""
+            <rect x="{cx + 13:.1f}" y="{cy - 24:.1f}" width="28" height="16" rx="8" fill="#0f172a" stroke="{accent_hex}" stroke-width="1.2"/>
+            <text x="{cx + 27:.1f}" y="{cy - 13:.1f}" text-anchor="middle" fill="#ffffff" font-family="sans-serif" font-size="10" font-weight="700">{voto_val}</text>
+            """
+
+        cerchi_svg.append(f"""
+        <g>
+            <circle cx="{cx:.1f}" cy="{cy:.1f}" r="22" fill="rgba(0,0,0,0.42)"/>
+            <circle cx="{cx:.1f}" cy="{cy:.1f}" r="20" fill="{fill_maglia}" stroke="{stroke_maglia}" stroke-width="2.2"/>
+            <text x="{cx:.1f}" y="{cy + 5:.1f}" text-anchor="middle" fill="#ffffff" font-family="sans-serif" font-size="13" font-weight="800">{maglia}</text>
+            {badge_voto}
+            <rect x="{cx - 48:.1f}" y="{cy + 24:.1f}" width="96" height="29" rx="7" fill="rgba(9, 10, 15, 0.88)" stroke="rgba(255,255,255,0.22)" stroke-width="1"/>
+            <text x="{cx:.1f}" y="{cy + 37:.1f}" text-anchor="middle" fill="#ffffff" font-family="sans-serif" font-size="11" font-weight="700">{nome_short}</text>
+            <text x="{cx:.1f}" y="{cy + 49:.1f}" text-anchor="middle" fill="{accent_hex}" font-family="sans-serif" font-size="9.5" font-weight="700">{ruolo_tag}</text>
+        </g>
+        """)
+
+    return f"""
+    <div style="
+        background-color: {bg_card_hex};
+        border: 1px solid {accent_hex};
+        border-radius: 14px;
+        padding: 12px;
+        box-shadow: 0 10px 26px rgba(0,0,0,0.45);
+        max-width: 640px;
+        margin: 0 auto;
+    ">
+        <svg viewBox="0 0 600 860" width="100%" style="display:block; border-radius:10px;">
+            <defs>
+                <linearGradient id="pitchGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#0f5132"/>
+                    <stop offset="50%" stop-color="#146c43"/>
+                    <stop offset="100%" stop-color="#0f5132"/>
+                </linearGradient>
+            </defs>
+            <rect x="0" y="0" width="600" height="860" rx="10" fill="url(#pitchGrad)"/>
+            <!-- Fasce erba -->
+            <rect x="28" y="32" width="544" height="88" fill="rgba(255,255,255,0.03)"/>
+            <rect x="28" y="208" width="544" height="88" fill="rgba(255,255,255,0.03)"/>
+            <rect x="28" y="384" width="544" height="88" fill="rgba(255,255,255,0.03)"/>
+            <rect x="28" y="560" width="544" height="88" fill="rgba(255,255,255,0.03)"/>
+            <rect x="28" y="736" width="544" height="92" fill="rgba(255,255,255,0.03)"/>
+
+            <!-- Linee perimetrali e centrocampo -->
+            <rect x="28" y="32" width="544" height="796" fill="none" stroke="rgba(255,255,255,0.78)" stroke-width="2.5"/>
+            <line x1="28" y1="430" x2="572" y2="430" stroke="rgba(255,255,255,0.78)" stroke-width="2.2"/>
+            <circle cx="300" cy="430" r="68" fill="none" stroke="rgba(255,255,255,0.78)" stroke-width="2.2"/>
+            <circle cx="300" cy="430" r="4" fill="rgba(255,255,255,0.9)"/>
+
+            <!-- Area di rigore alta (avversaria) -->
+            <rect x="148" y="32" width="304" height="122" fill="none" stroke="rgba(255,255,255,0.78)" stroke-width="2.2"/>
+            <rect x="224" y="32" width="152" height="46" fill="none" stroke="rgba(255,255,255,0.78)" stroke-width="2.2"/>
+            <circle cx="300" cy="114" r="3.5" fill="rgba(255,255,255,0.9)"/>
+            <path d="M 244 154 A 64 64 0 0 0 356 154" fill="none" stroke="rgba(255,255,255,0.78)" stroke-width="2.2"/>
+
+            <!-- Area di rigore bassa (propria) -->
+            <rect x="148" y="706" width="304" height="122" fill="none" stroke="rgba(255,255,255,0.78)" stroke-width="2.2"/>
+            <rect x="224" y="782" width="152" height="46" fill="none" stroke="rgba(255,255,255,0.78)" stroke-width="2.2"/>
+            <circle cx="300" cy="746" r="3.5" fill="rgba(255,255,255,0.9)"/>
+            <path d="M 244 706 A 64 64 0 0 1 356 706" fill="none" stroke="rgba(255,255,255,0.78)" stroke-width="2.2"/>
+
+            <!-- Etichetta modulo in alto -->
+            <rect x="40" y="42" width="96" height="24" rx="6" fill="rgba(9,10,15,0.75)"/>
+            <text x="88" y="58" text-anchor="middle" fill="#ffffff" font-family="sans-serif" font-size="12" font-weight="800">MODULO {modulo_use}</text>
+
+            {''.join(cerchi_svg)}
+        </svg>
+    </div>
+    """
+
+# =====================================================================
 # SIDEBAR, LOGIN ADMIN, PERSISTENZA SELEZIONE PARTITA & NAVIGAZIONE
 # =====================================================================
 db_giocatori = st.session_state["database_giocatori"]
@@ -1437,7 +1699,14 @@ with st.sidebar:
         if not ammesse_ragazzi:
             ammesse_ragazzi = [
                 s for s in schede_attive_cfg
-                if s in ["🎥 Video Analisi", "📈 Riepilogo Squadra", "📊 Grafici & Analisi Visiva", "🟨 Fair Play"]
+                if s in [
+                    "🧲 Lavagna Tattica",
+                    "🎥 Video Analisi",
+                    "📈 Riepilogo Squadra",
+                    "⚖️ Confronto Giocatori",
+                    "📊 Grafici & Analisi Visiva",
+                    "🟨 Fair Play",
+                ]
             ] or [schede_attive_cfg[0]]
         sezioni_disponibili = ammesse_ragazzi
 
@@ -1463,7 +1732,7 @@ if menu == "📋 Setup Partite & Formazioni":
                 with st.form("form_nuova_partita"):
                     n_avv = st.text_input("Squadra Avversaria")
                     n_data = st.text_input("Data (es. 29/03/2026)")
-                    n_mod = st.selectbox("Modulo Titolari", ["4-4-2", "4-3-3", "3-5-2", "4-2-3-1"])
+                    n_mod = st.selectbox("Modulo Titolari", ["4-3-3", "4-4-2", "3-5-2", "4-2-3-1"])
                     n_ris = st.text_input("Risultato (es. 2-1)", value="N.D.")
                     n_ct = st.selectbox("Casa / Trasferta", ["Casa", "Trasferta"])
                     if st.form_submit_button("💾") and n_avv:
@@ -1473,7 +1742,9 @@ if menu == "📋 Setup Partite & Formazioni":
                                 "avversario": n_avv, "data": n_data, "modulo": n_mod,
                                 "risultato": n_ris, "casa_trasferta": n_ct, "youtube_link": "",
                                 "formazione": {str(i): "" for i in range(1, 21)},
-                                "dati_prestazione": {}
+                                "dati_prestazione": {},
+                                "note_tattiche": "",
+                                "stile_tattico": STILI_TATTICI_OPZIONI[0],
                             }
                             st.session_state["partita_attiva"] = nome_p
                             salva_dati_su_disco()
@@ -1548,7 +1819,7 @@ if menu == "📋 Setup Partite & Formazioni":
                     idx_ct = ct_opts.index(p_info.get("casa_trasferta", "Casa")) if p_info.get("casa_trasferta", "Casa") in ct_opts else 0
                     nuovo_ct = st.selectbox("Casa / Trasferta", ct_opts, index=idx_ct)
                 with c_mod:
-                    moduli_disponibili = ["4-4-2", "4-3-3", "3-5-2", "4-2-3-1"]
+                    moduli_disponibili = ["4-3-3", "4-4-2", "3-5-2", "4-2-3-1"]
                     idx_mod = moduli_disponibili.index(p_info["modulo"]) if p_info["modulo"] in moduli_disponibili else 0
                     nuovo_modulo = st.selectbox("Modulo di Gioco", moduli_disponibili, index=idx_mod)
 
@@ -1595,7 +1866,157 @@ if menu == "📋 Setup Partite & Formazioni":
                     st.rerun()
 
 # =====================================================================
-# 2. INSERIMENTO PARAMETRI & VOTI (MODELLO SNELLO & VISIVO + FAIR PLAY)
+# 2. LAVAGNA TATTICA
+# =====================================================================
+elif menu == "🧲 Lavagna Tattica":
+    st.title("🧲 Lavagna Tattica & Disposizione in Campo")
+    lettura_only = is_sola_lettura()
+
+    if not db_partite:
+        st.warning("⚠️ Crea prima una partita nella sezione 'Setup Partite & Formazioni'.")
+        st.stop()
+
+    partita_sel = selettore_partita_persistente("Seleziona Partita", "sel_partita_lavagna")
+    p_info = db_partite[partita_sel]
+    formazione_p = p_info.get("formazione", {})
+    dati_prest_p = p_info.get("dati_prestazione", {})
+
+    moduli_disp = list(COORDINATE_MODULI.keys())
+    modulo_attuale = p_info.get("modulo", "4-3-3")
+    if modulo_attuale not in moduli_disp:
+        modulo_attuale = "4-3-3"
+
+    col_campo, col_controlli = st.columns([1.35, 1.0])
+
+    with col_controlli:
+        st.markdown("### 📐 Impostazioni Schieramento")
+        if lettura_only:
+            modulo_scelto = modulo_attuale
+            stile_scelto = p_info.get("stile_tattico", STILI_TATTICI_OPZIONI[0])
+            st.markdown(f"**Modulo:** {modulo_scelto} · **Principio:** {stile_scelto}")
+        else:
+            modulo_scelto = st.selectbox(
+                "Modulo in campo",
+                moduli_disp,
+                index=moduli_disp.index(modulo_attuale),
+                key=f"lavagna_mod_{partita_sel}"
+            )
+            stile_curr = p_info.get("stile_tattico", STILI_TATTICI_OPZIONI[0])
+            idx_stile = STILI_TATTICI_OPZIONI.index(stile_curr) if stile_curr in STILI_TATTICI_OPZIONI else 0
+            stile_scelto = st.selectbox(
+                "Principio / Filosofia Tattica",
+                STILI_TATTICI_OPZIONI,
+                index=idx_stile,
+                key=f"lavagna_stile_{partita_sel}"
+            )
+
+        # Costruzione nodi titolari (maglie 1..11) mappati sulle coordinate del modulo
+        layout_mod = COORDINATE_MODULI[modulo_scelto]
+        nodi_campo = []
+        maglie_usate = set()
+
+        for idx_pos, pos_cfg in enumerate(layout_mod):
+            slot_pref = pos_cfg["slot"]
+            if "_" in slot_pref:
+                slot_pref = pos_cfg.get("maglia_fallback", str(idx_pos + 1))
+
+            # Se la maglia preferita è libera usala, altrimenti prendi la prima maglia 1..11 non ancora assegnata
+            if slot_pref not in maglie_usate and str(slot_pref) in [str(m) for m in range(1, 12)]:
+                maglia_num = str(slot_pref)
+            else:
+                maglia_num = next(
+                    (str(m) for m in range(1, 12) if str(m) not in maglie_usate),
+                    str(idx_pos + 1)
+                )
+            maglie_usate.add(maglia_num)
+
+            nome_g = formazione_p.get(maglia_num, formazione_p.get(int(maglia_num), "")) or "-"
+            d_g = dati_prest_p.get(nome_g, {}) if nome_g != "-" else {}
+            is_por = (maglia_num == "1")
+            ruolo_eff = "POR" if is_por else (d_g.get("ruolo_campo") or pos_cfg["ruolo"])
+            voto_g = calcola_voto(d_g, is_portiere=is_por) if (d_g and int(d_g.get("minuti", 0)) > 0) else None
+
+            nodi_campo.append({
+                "maglia": maglia_num,
+                "nome": nome_g,
+                "ruolo": ruolo_eff,
+                "voto": voto_g,
+                "x": pos_cfg["x"],
+            })
+
+        if not lettura_only:
+            st.markdown("#### 🔄 Scambio Rapido Posizioni (Titolari 1-11)")
+            opzioni_scambio = [
+                f"N° {n['maglia']} — {n['nome']} ({n['ruolo']})"
+                for n in nodi_campo
+            ]
+            c_sc1, c_sc2 = st.columns(2)
+            with c_sc1:
+                sel_a = st.selectbox("Giocatore 1", opzioni_scambio, index=0, key=f"swap_a_{partita_sel}")
+            with c_sc2:
+                sel_b = st.selectbox("Giocatore 2", opzioni_scambio, index=min(1, len(opzioni_scambio) - 1), key=f"swap_b_{partita_sel}")
+
+            if st.button("🔁 Inverti i due giocatori sul campo", use_container_width=True, key=f"btn_swap_{partita_sel}"):
+                m_a = sel_a.split("—")[0].replace("N°", "").strip()
+                m_b = sel_b.split("—")[0].replace("N°", "").strip()
+                if m_a != m_b:
+                    g_a = formazione_p.get(m_a, "")
+                    g_b = formazione_p.get(m_b, "")
+                    formazione_p[m_a] = g_b
+                    formazione_p[m_b] = g_a
+                    salva_dati_su_disco()
+                    st.success(f"Invertiti N° {m_a} e N° {m_b}!")
+                    st.rerun()
+                else:
+                    st.warning("Seleziona due maglie diverse per invertirle.")
+
+        st.divider()
+        st.markdown("#### 🔗 Catene Laterali & Panchina")
+        fascia_sx = [f"N°{n['maglia']} {n['nome']} ({n['ruolo']})" for n in nodi_campo if n["x"] <= 32 and n["nome"] != "-"]
+        fascia_dx = [f"N°{n['maglia']} {n['nome']} ({n['ruolo']})" for n in nodi_campo if n["x"] >= 68 and n["nome"] != "-"]
+        asse_cen = [f"N°{n['maglia']} {n['nome']} ({n['ruolo']})" for n in nodi_campo if 32 < n["x"] < 68 and n["nome"] != "-"]
+
+        st.markdown(f"**⬅️ Catena Sinistra:** {', '.join(fascia_sx) if fascia_sx else 'Nessun giocatore assegnato'}")
+        st.markdown(f"**🎯 Asse Centrale:** {', '.join(asse_cen) if asse_cen else 'Nessun giocatore assegnato'}")
+        st.markdown(f"**➡️ Catena Destra:** {', '.join(fascia_dx) if fascia_dx else 'Nessun giocatore assegnato'}")
+
+        panchina_list = []
+        for m_res in range(12, 21):
+            g_res = formazione_p.get(str(m_res), formazione_p.get(m_res, ""))
+            if g_res:
+                panchina_list.append(f"N°{m_res} {g_res}")
+        st.markdown(f"**🔵 Panchina ({len(panchina_list)}):** {', '.join(panchina_list) if panchina_list else 'Vuota'}")
+
+        st.divider()
+        st.markdown("#### 📝 Note Tattiche & Piano Gara")
+        note_attuali = p_info.get("note_tattiche", "")
+        if lettura_only:
+            if note_attuali:
+                st.info(note_attuali)
+            else:
+                st.caption("Nessuna nota tattica inserita per questa gara.")
+        else:
+            nuove_note = st.text_area(
+                "Appunti su pressing, uscite palla, calci piazzati o indicazioni per i ragazzi",
+                value=note_attuali,
+                height=135,
+                key=f"note_tattiche_{partita_sel}"
+            )
+            if st.button("💾 Salva Lavagna & Note Tattiche", use_container_width=True, key=f"btn_save_lavagna_{partita_sel}"):
+                p_info["modulo"] = modulo_scelto
+                p_info["stile_tattico"] = stile_scelto
+                p_info["note_tattiche"] = nuove_note.strip()
+                st.session_state["partita_attiva"] = partita_sel
+                salva_dati_su_disco()
+                st.success("Lavagna tattica e note salvate!")
+                st.rerun()
+
+    with col_campo:
+        svg_html = genera_svg_lavagna_tattica(modulo_scelto, nodi_campo, accent_hex, tema["bg_card"])
+        st.markdown(svg_html, unsafe_allow_html=True)
+
+# =====================================================================
+# 3. INSERIMENTO PARAMETRI & VOTI (MODELLO SNELLO & VISIVO + FAIR PLAY)
 # =====================================================================
 elif menu == "⚡ Inserimento Parametri & Voti":
     st.title("⚡ Valutazione Snella Post-Partita & Voti")
@@ -1691,6 +2112,8 @@ elif menu == "⚡ Inserimento Parametri & Voti":
 
                 is_portiere = (i == 1)
                 default_ruolo_g = ruolo_default_da_rosa(db_giocatori.get(nome_g, {}).get("ruolo", ""))
+                if default_ruolo_g == "POR":
+                    default_ruolo_g = "CC"
                 current_vals = p_dati["dati_prestazione"].get(nome_g, {})
                 fp_curr = estrai_fairplay_compat(current_vals)
 
@@ -1822,6 +2245,8 @@ elif menu == "⚡ Inserimento Parametri & Voti":
 
                 is_portiere = (i == 12)
                 default_ruolo_g = ruolo_default_da_rosa(db_giocatori.get(nome_g, {}).get("ruolo", ""))
+                if default_ruolo_g == "POR":
+                    default_ruolo_g = "CC"
                 current_vals = p_dati["dati_prestazione"].get(nome_g, {})
                 fp_curr = estrai_fairplay_compat(current_vals)
 
@@ -2010,7 +2435,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 st.download_button("📊 Esporta CSV Match", csv_data, file_name=f"Match_{partita_sel}.csv", mime="text/csv")
 
 # =====================================================================
-# 3. VIDEO ANALISI
+# 4. VIDEO ANALISI
 # =====================================================================
 elif menu == "🎥 Video Analisi":
     st.title("🎥 Video Analisi & Streaming Partita")
@@ -2114,7 +2539,7 @@ elif menu == "🎥 Video Analisi":
         """, unsafe_allow_html=True)
 
 # =====================================================================
-# 4. RIEPILOGO SQUADRA & GIOCATORI (ADATTATO AL MODELLO SNELLO)
+# 5. RIEPILOGO SQUADRA & GIOCATORI
 # =====================================================================
 elif menu == "📈 Riepilogo Squadra":
     st.title("📈 Riepilogo Squadra & Statistiche Stagionali")
@@ -2422,7 +2847,293 @@ elif menu == "📈 Riepilogo Squadra":
         st.info("Nessuna partita con dati registrati per questo giocatore.")
 
 # =====================================================================
-# 5. GRAFICI & ANALISI VISIVA (ADATTATI AL MODELLO SNELLO)
+# 6. CONFRONTO GIOCATORI
+# =====================================================================
+elif menu == "⚖️ Confronto Giocatori":
+    st.title("⚖️ Confronto Diretto Tra Due Giocatori")
+    st.caption("Metti a confronto rendimento, voti, minutaggio, contributi offensivi/difensivi e disciplina tra due giocatori della rosa.")
+
+    nomi_rosa_comp = list(db_giocatori.keys()) if db_giocatori else []
+    if len(nomi_rosa_comp) < 2:
+        st.warning("⚠️ Servono almeno 2 giocatori in rosa per effettuare un confronto.")
+        st.stop()
+
+    col_sel_a, col_sel_b = st.columns(2)
+    with col_sel_a:
+        gioc_a = st.selectbox("🔵 Giocatore A", nomi_rosa_comp, index=0, key="comp_gioc_a")
+    with col_sel_b:
+        idx_b_def = 1 if len(nomi_rosa_comp) > 1 else 0
+        gioc_b = st.selectbox("🟠 Giocatore B", nomi_rosa_comp, index=idx_b_def, key="comp_gioc_b")
+
+    if gioc_a == gioc_b:
+        st.info("ℹ️ Stai confrontando lo stesso giocatore. Seleziona un secondo giocatore diverso per vedere le differenze.")
+
+    stat_a = calcola_statistiche_stagionali_giocatore(gioc_a, db_partite, db_giocatori)
+    stat_b = calcola_statistiche_stagionali_giocatore(gioc_b, db_partite, db_giocatori)
+
+    # Schede profilo affiancate
+    col_card_a, col_card_b = st.columns(2)
+    for col_target, st_g, colore_bordo, badge_lbl in [
+        (col_card_a, stat_a, accent_hex, "GIOCATORE A"),
+        (col_card_b, stat_b, "#38bdf8", "GIOCATORE B"),
+    ]:
+        with col_target:
+            foto_p = ottieni_foto_valida(st_g["nome"], db_giocatori)
+            c_ph, c_inf = st.columns([0.24, 0.76])
+            with c_ph:
+                if foto_p:
+                    st.image(foto_p, width=74)
+                else:
+                    st.markdown(
+                        f"<div style='width:74px;height:74px;border-radius:12px;display:flex;align-items:center;"
+                        f"justify-content:center;background:#1e2230;border:1px solid {colore_bordo};font-size:30px;'>🧑🏻</div>",
+                        unsafe_allow_html=True
+                    )
+            with c_inf:
+                st.markdown(
+                    f"<span style='font-size:11px;font-weight:800;letter-spacing:1px;color:{colore_bordo};'>{badge_lbl}</span>"
+                    f"<h3 style='margin:2px 0 4px 0;'>{st_g['nome']}</h3>"
+                    f"<div style='font-size:13px;color:#cbd5e1;'>Ruolo rosa: <strong>{st_g['ruolo_rosa']}</strong> · "
+                    f"Ruolo campo freq.: <strong>{st_g['ruolo_prevalente']}</strong></div>",
+                    unsafe_allow_html=True
+                )
+
+    st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+
+    # KPI principali a confronto
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric(
+        f"Media Voto ({gioc_a})",
+        f"{stat_a['media_voto']} / 10" if stat_a["media_voto"] is not None else "N.D.",
+        delta=f"{round(stat_a['media_voto'] - stat_b['media_voto'], 2):+.2f} vs {gioc_b}" if (stat_a["media_voto"] is not None and stat_b["media_voto"] is not None and gioc_a != gioc_b) else None
+    )
+    k2.metric(
+        f"Media Voto ({gioc_b})",
+        f"{stat_b['media_voto']} / 10" if stat_b["media_voto"] is not None else "N.D.",
+        delta=f"{round(stat_b['media_voto'] - stat_a['media_voto'], 2):+.2f} vs {gioc_a}" if (stat_a["media_voto"] is not None and stat_b["media_voto"] is not None and gioc_a != gioc_b) else None
+    )
+    k3.metric(
+        f"Minuti ({gioc_a})",
+        f"{stat_a['minuti']}'",
+        delta=f"{stat_a['minuti'] - stat_b['minuti']:+d}' vs {gioc_b}" if gioc_a != gioc_b else None
+    )
+    k4.metric(
+        f"Minuti ({gioc_b})",
+        f"{stat_b['minuti']}'",
+        delta=f"{stat_b['minuti'] - stat_a['minuti']:+d}' vs {gioc_a}" if gioc_a != gioc_b else None
+    )
+
+    st.divider()
+    st.subheader("📋 Tabella Comparativa Stagionale")
+
+    def _vincitore_num(val_a, val_b, higher_is_better=True):
+        if val_a is None or val_b is None or val_a == val_b:
+            return "Pareggio"
+        if higher_is_better:
+            return gioc_a if val_a > val_b else gioc_b
+        return gioc_a if val_a < val_b else gioc_b
+
+    righe_tab_comp = [
+        {
+            "Parametro": "Presenze Totali (Tit. / Sub.)",
+            gioc_a: f"{stat_a['presenze']} ({stat_a['titolari']} / {stat_a['subentri']})",
+            gioc_b: f"{stat_b['presenze']} ({stat_b['titolari']} / {stat_b['subentri']})",
+            "Vantaggio": _vincitore_num(stat_a["presenze"], stat_b["presenze"], True),
+        },
+        {
+            "Parametro": "Minuti Giocati",
+            gioc_a: f"{stat_a['minuti']}'",
+            gioc_b: f"{stat_b['minuti']}'",
+            "Vantaggio": _vincitore_num(stat_a["minuti"], stat_b["minuti"], True),
+        },
+        {
+            "Parametro": "Media Voto Stagionale",
+            gioc_a: f"{stat_a['media_voto']} / 10" if stat_a["media_voto"] is not None else "N.D.",
+            gioc_b: f"{stat_b['media_voto']} / 10" if stat_b["media_voto"] is not None else "N.D.",
+            "Vantaggio": _vincitore_num(stat_a["media_voto"], stat_b["media_voto"], True),
+        },
+        {
+            "Parametro": "Miglior Voto",
+            gioc_a: f"{stat_a['best_voto']} / 10" if stat_a["best_voto"] is not None else "N.D.",
+            gioc_b: f"{stat_b['best_voto']} / 10" if stat_b["best_voto"] is not None else "N.D.",
+            "Vantaggio": _vincitore_num(stat_a["best_voto"], stat_b["best_voto"], True),
+        },
+        {
+            "Parametro": "Trend Rendimento",
+            gioc_a: stat_a["trend"],
+            gioc_b: stat_b["trend"],
+            "Vantaggio": "-",
+        },
+    ]
+
+    if stat_a["is_portiere"] and stat_b["is_portiere"]:
+        righe_tab_comp.extend([
+            {
+                "Parametro": "Sicurezza Media",
+                gioc_a: stat_a["sicurezza_media"],
+                gioc_b: stat_b["sicurezza_media"],
+                "Vantaggio": "-",
+            },
+            {
+                "Parametro": "Parate Decisive",
+                gioc_a: stat_a["parate"],
+                gioc_b: stat_b["parate"],
+                "Vantaggio": _vincitore_num(stat_a["parate"], stat_b["parate"], True),
+            },
+            {
+                "Parametro": "Gol Subiti (meno = meglio)",
+                gioc_a: stat_a["gol_subiti"],
+                gioc_b: stat_b["gol_subiti"],
+                "Vantaggio": _vincitore_num(stat_a["gol_subiti"], stat_b["gol_subiti"], False),
+            },
+        ])
+    else:
+        righe_tab_comp.extend([
+            {
+                "Parametro": "Impatto Medio",
+                gioc_a: stat_a["impatto_medio"],
+                gioc_b: stat_b["impatto_medio"],
+                "Vantaggio": "-",
+            },
+            {
+                "Parametro": "Gestione Palla & Duelli",
+                gioc_a: stat_a["gestione_media"],
+                gioc_b: stat_b["gestione_media"],
+                "Vantaggio": "-",
+            },
+            {
+                "Parametro": "Gol Segnati",
+                gioc_a: stat_a["gol"],
+                gioc_b: stat_b["gol"],
+                "Vantaggio": _vincitore_num(stat_a["gol"], stat_b["gol"], True),
+            },
+            {
+                "Parametro": "Assist",
+                gioc_a: stat_a["assist"],
+                gioc_b: stat_b["assist"],
+                "Vantaggio": _vincitore_num(stat_a["assist"], stat_b["assist"], True),
+            },
+        ])
+
+    righe_tab_comp.extend([
+        {
+            "Parametro": "Errori Gravi (meno = meglio)",
+            gioc_a: stat_a["errori"],
+            gioc_b: stat_b["errori"],
+            "Vantaggio": _vincitore_num(stat_a["errori"], stat_b["errori"], False),
+        },
+        {
+            "Parametro": "🟡 Ammonizioni (meno = meglio)",
+            gioc_a: stat_a["ammonizioni"],
+            gioc_b: stat_b["ammonizioni"],
+            "Vantaggio": _vincitore_num(stat_a["ammonizioni"], stat_b["ammonizioni"], False),
+        },
+        {
+            "Parametro": "🔴 Espulsioni (meno = meglio)",
+            gioc_a: stat_a["espulsioni"],
+            gioc_b: stat_b["espulsioni"],
+            "Vantaggio": _vincitore_num(stat_a["espulsioni"], stat_b["espulsioni"], False),
+        },
+    ])
+
+    st.table(pd.DataFrame(righe_tab_comp))
+
+    st.divider()
+    st.subheader("📊 Grafici Comparativi")
+
+    c_graf_c1, c_graf_c2 = st.columns(2)
+    with c_graf_c1:
+        st.markdown("**Confronto Contributi & Disciplina**")
+        if stat_a["is_portiere"] and stat_b["is_portiere"]:
+            df_bar_comp = pd.DataFrame([
+                {"Metrica": "Parate Dec.", "Giocatore": gioc_a, "Valore": stat_a["parate"]},
+                {"Metrica": "Parate Dec.", "Giocatore": gioc_b, "Valore": stat_b["parate"]},
+                {"Metrica": "Gol Subiti", "Giocatore": gioc_a, "Valore": stat_a["gol_subiti"]},
+                {"Metrica": "Gol Subiti", "Giocatore": gioc_b, "Valore": stat_b["gol_subiti"]},
+                {"Metrica": "Errori Gravi", "Giocatore": gioc_a, "Valore": stat_a["errori"]},
+                {"Metrica": "Errori Gravi", "Giocatore": gioc_b, "Valore": stat_b["errori"]},
+                {"Metrica": "Ammonizioni", "Giocatore": gioc_a, "Valore": stat_a["ammonizioni"]},
+                {"Metrica": "Ammonizioni", "Giocatore": gioc_b, "Valore": stat_b["ammonizioni"]},
+            ])
+        else:
+            df_bar_comp = pd.DataFrame([
+                {"Metrica": "Gol", "Giocatore": gioc_a, "Valore": stat_a["gol"]},
+                {"Metrica": "Gol", "Giocatore": gioc_b, "Valore": stat_b["gol"]},
+                {"Metrica": "Assist", "Giocatore": gioc_a, "Valore": stat_a["assist"]},
+                {"Metrica": "Assist", "Giocatore": gioc_b, "Valore": stat_b["assist"]},
+                {"Metrica": "Errori Gravi", "Giocatore": gioc_a, "Valore": stat_a["errori"]},
+                {"Metrica": "Errori Gravi", "Giocatore": gioc_b, "Valore": stat_b["errori"]},
+                {"Metrica": "Ammonizioni", "Giocatore": gioc_a, "Valore": stat_a["ammonizioni"]},
+                {"Metrica": "Ammonizioni", "Giocatore": gioc_b, "Valore": stat_b["ammonizioni"]},
+            ])
+
+        chart_bar_comp = (
+            alt.Chart(df_bar_comp)
+            .mark_bar(cornerRadiusTopLeft=5, cornerRadiusTopRight=5)
+            .encode(
+                x=alt.X("Metrica:N", title="Metrica"),
+                y=alt.Y("Valore:Q", title="Totale"),
+                xOffset=alt.XOffset("Giocatore:N"),
+                color=alt.Color(
+                    "Giocatore:N",
+                    scale=alt.Scale(domain=[gioc_a, gioc_b], range=[accent_hex, "#38bdf8"]),
+                    legend=alt.Legend(title="Giocatore")
+                ),
+                tooltip=["Giocatore", "Metrica", "Valore"]
+            )
+            .properties(height=280, background="transparent")
+            .configure_view(stroke=None, fill="transparent")
+            .configure_axis(labelColor=tema["text_color"], titleColor="#cbd5e1", gridColor=hex_to_rgba(tema["text_color"], 0.10))
+            .configure_legend(labelColor=tema["text_color"], titleColor="#cbd5e1")
+        )
+        st.altair_chart(chart_bar_comp, use_container_width=True)
+
+    with c_graf_c2:
+        st.markdown("**Andamento Voti Partita per Partita**")
+        righe_line_comp = []
+        for item in stat_a["serie_match"]:
+            righe_line_comp.append({
+                "Ordine": item["Ordine"],
+                "Partita": item["Partita"],
+                "Giocatore": gioc_a,
+                "Voto": item["Voto"],
+                "Minuti": item["Minuti"],
+            })
+        for item in stat_b["serie_match"]:
+            righe_line_comp.append({
+                "Ordine": item["Ordine"],
+                "Partita": item["Partita"],
+                "Giocatore": gioc_b,
+                "Voto": item["Voto"],
+                "Minuti": item["Minuti"],
+            })
+
+        if righe_line_comp:
+            df_line_comp = pd.DataFrame(righe_line_comp)
+            chart_line_comp = (
+                alt.Chart(df_line_comp)
+                .mark_line(point=alt.OverlayMarkDef(filled=True, size=70), strokeWidth=3)
+                .encode(
+                    x=alt.X("Partita:N", sort=alt.EncodingSortField(field="Ordine", order="ascending"), title="Partita"),
+                    y=alt.Y("Voto:Q", scale=alt.Scale(domain=[1, 10]), title="Voto"),
+                    color=alt.Color(
+                        "Giocatore:N",
+                        scale=alt.Scale(domain=[gioc_a, gioc_b], range=[accent_hex, "#38bdf8"]),
+                        legend=alt.Legend(title="Giocatore")
+                    ),
+                    tooltip=["Giocatore", "Partita", "Minuti", "Voto"]
+                )
+                .properties(height=280, background="transparent")
+                .configure_view(stroke=None, fill="transparent")
+                .configure_axis(labelColor=tema["text_color"], titleColor="#cbd5e1", gridColor=hex_to_rgba(tema["text_color"], 0.10))
+                .configure_legend(labelColor=tema["text_color"], titleColor="#cbd5e1")
+            )
+            st.altair_chart(chart_line_comp, use_container_width=True)
+        else:
+            st.info("Nessun voto disponibile per tracciare l'andamento.")
+
+# =====================================================================
+# 7. GRAFICI & ANALISI VISIVA
 # =====================================================================
 elif menu == "📊 Grafici & Analisi Visiva":
     st.title("📊 Grafici & Analisi Visiva")
@@ -2800,7 +3511,7 @@ elif menu == "📊 Grafici & Analisi Visiva":
             st.markdown("</div>", unsafe_allow_html=True)
 
 # =====================================================================
-# 6. FAIR PLAY (AMMONIZIONI & ESPULSIONI)
+# 8. FAIR PLAY (AMMONIZIONI & ESPULSIONI)
 # =====================================================================
 elif menu == "🟨 Fair Play":
     st.title("🟨 Fair Play — Ammonizioni & Espulsioni")
@@ -2908,7 +3619,7 @@ elif menu == "🟨 Fair Play":
         st.info("Nessuna partita con cartellini registrati.")
 
 # =====================================================================
-# 7. GESTIONE ROSA
+# 9. GESTIONE ROSA
 # =====================================================================
 elif menu == "👤 Gestione Rosa":
     st.title("👤 Gestione Rosa Squadra")
@@ -3067,7 +3778,7 @@ elif menu == "👤 Gestione Rosa":
                                 st.rerun()
 
 # =====================================================================
-# 8. EDITOR GRAFICA & SETTINGS
+# 10. EDITOR GRAFICA & SETTINGS
 # =====================================================================
 elif menu == "🎨 Editor Grafica":
     st.title("🎨 Editor Grafica & Impostazioni UI")
@@ -3156,7 +3867,7 @@ elif menu == "🎨 Editor Grafica":
         st.rerun()
 
 # =====================================================================
-# 9. PANNELLO ADMIN
+# 11. PANNELLO ADMIN
 # =====================================================================
 elif menu == "🛡️ Pannello Admin":
     if not st.session_state.get("is_admin", False):
