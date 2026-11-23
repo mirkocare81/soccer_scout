@@ -120,6 +120,7 @@ TUTTE_LE_SCHEDE_APP = [
     "🎥 Video Analisi",
     "📈 Riepilogo Squadra",
     "📊 Grafici & Analisi Visiva",
+    "🟨 Fair Play",
     "👤 Gestione Rosa",
     "🎨 Editor Grafica",
 ]
@@ -221,6 +222,35 @@ def calcola_media_giudizio(valori, opzioni, scala):
     media_val = sum(valori_validi) / len(valori_validi)
     return min(opzioni, key=lambda k: abs(scala[k] - media_val))
 
+def estrai_fairplay_compat(d_p):
+    """Estrae i flag booleani ammonito ed espulso da una prestazione giocatore."""
+    if not isinstance(d_p, dict):
+        return {"ammonito": False, "espulso": False}
+    amm = bool(d_p.get("ammonito", d_p.get("ammonizione", False)))
+    esp = bool(d_p.get("espulso", d_p.get("espulsione", False)))
+    return {"ammonito": amm, "espulso": esp}
+
+def render_indicatori_fairplay_html(ammonito, espulso):
+    """Restituisce il markup HTML dei puntini gialli/rossi per ammonizioni ed espulsioni."""
+    badges = []
+    if ammonito:
+        badges.append(
+            "<span title='Ammonito' style='display:inline-flex;align-items:center;gap:5px;"
+            "margin-left:8px;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;"
+            "background:rgba(234,179,8,0.16);border:1px solid rgba(234,179,8,0.65);color:#facc15;'>"
+            "<span style='width:8px;height:8px;border-radius:50%;background:#eab308;"
+            "box-shadow:0 0 6px #eab308;display:inline-block;'></span>AMM</span>"
+        )
+    if espulso:
+        badges.append(
+            "<span title='Espulso (-1 voto)' style='display:inline-flex;align-items:center;gap:5px;"
+            "margin-left:6px;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;"
+            "background:rgba(239,68,68,0.18);border:1px solid rgba(239,68,68,0.75);color:#f87171;'>"
+            "<span style='width:8px;height:8px;border-radius:50%;background:#ef4444;"
+            "box-shadow:0 0 7px #ef4444;display:inline-block;'></span>ESP -1</span>"
+        )
+    return "".join(badges)
+
 def get_macro_ruolo(ruolo_specifico):
     if ruolo_specifico in RUOLI_DIFENSORI:
         return "DIFENSORE"
@@ -258,12 +288,15 @@ def estrai_dati_movimento_compat(d_p):
     gol = int(d_p.get("gol_fatti", 0))
     assist = int(d_p.get("assist", 0))
     errori = int(d_p.get("errori_gravi", d_p.get("perse", 0)))
+    fp = estrai_fairplay_compat(d_p)
     return {
         "impatto_partita": impatto,
         "gestione_palla": gestione,
         "gol_fatti": gol,
         "assist": assist,
         "errori_gravi": errori,
+        "ammonito": fp["ammonito"],
+        "espulso": fp["espulso"],
     }
 
 def estrai_dati_portiere_compat(d_p):
@@ -275,11 +308,14 @@ def estrai_dati_portiere_compat(d_p):
         errori_p = int(d_p.get("errori_gravi", 0))
     else:
         gol_sub, errori_p = parse_frazione(d_p.get("gol_subiti_resp", "0/0"))
+    fp = estrai_fairplay_compat(d_p)
     return {
         "sicurezza_portiere": sicurezza,
         "parate_decisive": parate,
         "gol_subiti": gol_sub,
         "errori_gravi": errori_p,
+        "ammonito": fp["ammonito"],
+        "espulso": fp["espulso"],
     }
 
 def valori_base_giocatore(nome_g, is_portiere, is_riserva, db_giocatori):
@@ -292,6 +328,8 @@ def valori_base_giocatore(nome_g, is_portiere, is_riserva, db_giocatori):
             "parate_decisive": 0,
             "gol_subiti": 0,
             "errori_gravi": 0,
+            "ammonito": False,
+            "espulso": False,
         }
     return {
         "ruolo_campo": ruolo_default_da_rosa(db_giocatori.get(nome_g, {}).get("ruolo", "")),
@@ -301,6 +339,8 @@ def valori_base_giocatore(nome_g, is_portiere, is_riserva, db_giocatori):
         "gol_fatti": 0,
         "assist": 0,
         "errori_gravi": 0,
+        "ammonito": False,
+        "espulso": False,
     }
 
 def ripristina_parametri_partita(partita_sel, p_dati, db_giocatori):
@@ -334,6 +374,8 @@ def ripristina_parametri_partita(partita_sel, p_dati, db_giocatori):
         nuovi_dati[nome_g] = base.copy()
 
         if not is_riserva:
+            st.session_state[f"amm_{partita_sel}_{num_int}"] = False
+            st.session_state[f"esp_{partita_sel}_{num_int}"] = False
             if is_portiere:
                 st.session_state[f"min_{partita_sel}_{num_int}"] = int(base["minuti"])
                 st.session_state[f"sic_{partita_sel}_{num_int}"] = str(base["sicurezza_portiere"])
@@ -348,6 +390,8 @@ def ripristina_parametri_partita(partita_sel, p_dati, db_giocatori):
                 st.session_state[f"ass_{partita_sel}_{num_int}"] = int(base["assist"])
                 st.session_state[f"err_{partita_sel}_{num_int}"] = int(base["errori_gravi"])
         else:
+            st.session_state[f"amm_res_{partita_sel}_{num_int}"] = False
+            st.session_state[f"esp_res_{partita_sel}_{num_int}"] = False
             if is_portiere:
                 st.session_state[f"min_res_{partita_sel}_{num_int}"] = int(base["minuti"])
                 st.session_state[f"sic_res_{partita_sel}_{num_int}"] = str(base["sicurezza_portiere"])
@@ -463,6 +507,7 @@ def applica_payload_database(payload):
             "🎥 Video Analisi",
             "📈 Riepilogo Squadra",
             "📊 Grafici & Analisi Visiva",
+            "🟨 Fair Play",
         ])
         cfg_imp.setdefault("schede_attive", TUTTE_LE_SCHEDE_APP.copy())
         cfg_imp.setdefault("applica_nascoste_ad_admin", False)
@@ -603,6 +648,7 @@ def inizializza_sicurezza_ruoli(dati_salvati):
                 "🎥 Video Analisi",
                 "📈 Riepilogo Squadra",
                 "📊 Grafici & Analisi Visiva",
+                "🟨 Fair Play",
             ],
             "schede_attive": [
                 s for s in (cfg_salvata.get("schede_attive") or TUTTE_LE_SCHEDE_APP)
@@ -913,6 +959,15 @@ st.markdown(f"""
         margin-left: 8px;
     }}
 
+    .scoutai-fp-dot {{
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        display: inline-block;
+        vertical-align: middle;
+        margin-top: 8px;
+    }}
+
     .scoutai-video-empty {{
         background-color: {tema['bg_card']};
         border: 2px dashed {glow_border_rgba};
@@ -1092,7 +1147,7 @@ with col_title_h:
 st.divider()
 
 # =====================================================================
-# MOTORE DI CALCOLO VOTO SNELLO & VISIVO (PESATO PER AREA DI GIOCO)
+# MOTORE DI CALCOLO VOTO SNELLO & VISIVO (PESATO PER AREA DI GIOCO + ESPULSIONE -1)
 # =====================================================================
 def calcola_voto(p, is_portiere=False):
     try:
@@ -1114,6 +1169,8 @@ def calcola_voto(p, is_portiere=False):
             rating += parate_dec * 0.5
             rating -= gol_sub * 0.3
             rating -= errori_g * 1.0
+            if dati_p["espulso"]:
+                rating -= 1.0
         else:
             ruolo_campo = p.get("ruolo_campo", "CC")
             macro_ruolo = get_macro_ruolo(ruolo_campo)
@@ -1131,6 +1188,8 @@ def calcola_voto(p, is_portiere=False):
             rating += gol_fatti * 1.0
             rating += assist * (0.5 * pesi["assist"])
             rating -= errori_gravi * (0.6 * pesi["errori"])
+            if dati_m["espulso"]:
+                rating -= 1.0
 
         return round(max(1.0, min(10.0, rating)), 1)
     except Exception:
@@ -1211,6 +1270,13 @@ def genera_pdf_partita(match_name, match_data, db_giocatori, accent_hex):
         is_portiere = (str(num) in ["1", "12"])
         voto_calcolato = calcola_voto(p_dati, is_portiere) if p_dati else None
         voto = str(voto_calcolato) if voto_calcolato is not None else "N.D."
+        fp = estrai_fairplay_compat(p_dati)
+        fp_txt = []
+        if fp["ammonito"]:
+            fp_txt.append("Amm.")
+        if fp["espulso"]:
+            fp_txt.append("Esp.")
+        fp_suffix = f" | FP: {','.join(fp_txt)}" if fp_txt else ""
 
         if is_portiere:
             ruolo_label = "POR (Porta)"
@@ -1219,7 +1285,7 @@ def genera_pdf_partita(match_name, match_data, db_giocatori, accent_hex):
                 f"Sicurezza: {dp['sicurezza_portiere']} | "
                 f"Parate dec.: {dp['parate_decisive']} | "
                 f"Gol sub.: {dp['gol_subiti']} | "
-                f"Errori: {dp['errori_gravi']}"
+                f"Errori: {dp['errori_gravi']}{fp_suffix}"
             )
         else:
             ruolo_c = p_dati.get("ruolo_campo") or ruolo_default_da_rosa(
@@ -1232,7 +1298,7 @@ def genera_pdf_partita(match_name, match_data, db_giocatori, accent_hex):
                 f"Palla: {dm['gestione_palla']} | "
                 f"Gol: {dm['gol_fatti']} | "
                 f"Assist: {dm['assist']} | "
-                f"Errori: {dm['errori_gravi']}"
+                f"Errori: {dm['errori_gravi']}{fp_suffix}"
             )
 
         foto_path = ottieni_foto_valida(nome, db_giocatori)
@@ -1371,7 +1437,7 @@ with st.sidebar:
         if not ammesse_ragazzi:
             ammesse_ragazzi = [
                 s for s in schede_attive_cfg
-                if s in ["🎥 Video Analisi", "📈 Riepilogo Squadra", "📊 Grafici & Analisi Visiva"]
+                if s in ["🎥 Video Analisi", "📈 Riepilogo Squadra", "📊 Grafici & Analisi Visiva", "🟨 Fair Play"]
             ] or [schede_attive_cfg[0]]
         sezioni_disponibili = ammesse_ragazzi
 
@@ -1529,7 +1595,7 @@ if menu == "📋 Setup Partite & Formazioni":
                     st.rerun()
 
 # =====================================================================
-# 2. INSERIMENTO PARAMETRI & VOTI (MODELLO SNELLO & VISIVO)
+# 2. INSERIMENTO PARAMETRI & VOTI (MODELLO SNELLO & VISIVO + FAIR PLAY)
 # =====================================================================
 elif menu == "⚡ Inserimento Parametri & Voti":
     st.title("⚡ Valutazione Snella Post-Partita & Voti")
@@ -1557,8 +1623,9 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 st.rerun()
 
     st.caption(
-        "Modello Snello & Visivo: scegli **Impatto partita** e **Gestione palla / duelli** (pesati automaticamente su **Difesa**, **Centrocampo** o **Attacco**), "
-        "poi segna solo gli eventi chiave (**Gol**, **Assist**, **Errori gravi**). Con `0'` giocati il voto resta `N.D.`."
+        "Modello Snello & Visivo: scegli **Impatto partita** e **Gestione palla / duelli** (pesati su **Difesa**, **Centrocampo** o **Attacco**), "
+        "segna **Gol**, **Assist**, **Errori gravi** e le spunte **Amm** / **Esp** accanto al nome. "
+        "**Solo le espulsioni** applicano un **-1.0** sul voto; l'ammonizione accende il punto **giallo** e l'espulsione quello **rosso**."
     )
 
     if lettura_only:
@@ -1570,6 +1637,12 @@ elif menu == "⚡ Inserimento Parametri & Voti":
             p_g = p_dati.get("dati_prestazione", {}).get(nome, {})
             min_g = int(p_g.get("minuti", 0)) if p_g else 0
             voto_g = calcola_voto(p_g, is_portiere) if (p_g and min_g > 0) else None
+            fp = estrai_fairplay_compat(p_g)
+            fp_label = []
+            if fp["ammonito"]:
+                fp_label.append("🟡 Amm.")
+            if fp["espulso"]:
+                fp_label.append("🔴 Esp. (-1)")
 
             if is_portiere:
                 dp = estrai_dati_portiere_compat(p_g)
@@ -1577,6 +1650,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 righe_lettura.append({
                     "N°": str(n),
                     "Giocatore": nome,
+                    "Fair Play": " · ".join(fp_label) if fp_label else "-",
                     "Ruolo / Area": ruolo_str,
                     "Minuti": f"{min_g}'",
                     "Sicurezza / Impatto": dp["sicurezza_portiere"],
@@ -1593,6 +1667,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 righe_lettura.append({
                     "N°": str(n),
                     "Giocatore": nome,
+                    "Fair Play": " · ".join(fp_label) if fp_label else "-",
                     "Ruolo / Area": ruolo_str,
                     "Minuti": f"{min_g}'",
                     "Sicurezza / Impatto": dm["impatto_partita"],
@@ -1617,13 +1692,30 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 is_portiere = (i == 1)
                 default_ruolo_g = ruolo_default_da_rosa(db_giocatori.get(nome_g, {}).get("ruolo", ""))
                 current_vals = p_dati["dati_prestazione"].get(nome_g, {})
+                fp_curr = estrai_fairplay_compat(current_vals)
 
                 if is_portiere:
                     dp_curr = estrai_dati_portiere_compat(current_vals)
-                    st.markdown(
-                        f"**N° {i} — {nome_g}** <span class='scoutai-area-badge'>Porta</span>",
-                        unsafe_allow_html=True
-                    )
+                    c_gioc, c_amm_chk, c_amm_dot, c_esp_chk, c_esp_dot = st.columns([2.2, 0.8, 0.25, 0.8, 0.25])
+                    with c_gioc:
+                        st.markdown(
+                            f"<div style='padding-top:6px;'><strong>N° {i} — {nome_g}</strong>"
+                            f"<span class='scoutai-area-badge'>Porta</span></div>",
+                            unsafe_allow_html=True
+                        )
+                    with c_amm_chk:
+                        amm_val = st.checkbox("Amm.", value=fp_curr["ammonito"], key=f"amm_{partita_sel}_{i}")
+                    with c_amm_dot:
+                        col_dot_a = "#eab308" if amm_val else "rgba(148,163,184,0.22)"
+                        glow_dot_a = "box-shadow:0 0 8px #eab308;" if amm_val else ""
+                        st.markdown(f"<span class='scoutai-fp-dot' style='background:{col_dot_a};{glow_dot_a}' title='Stato Ammonizione'></span>", unsafe_allow_html=True)
+                    with c_esp_chk:
+                        esp_val = st.checkbox("Esp.", value=fp_curr["espulso"], key=f"esp_{partita_sel}_{i}")
+                    with c_esp_dot:
+                        col_dot_e = "#ef4444" if esp_val else "rgba(148,163,184,0.22)"
+                        glow_dot_e = "box-shadow:0 0 8px #ef4444;" if esp_val else ""
+                        st.markdown(f"<span class='scoutai-fp-dot' style='background:{col_dot_e};{glow_dot_e}' title='Stato Espulsione (-1 voto)'></span>", unsafe_allow_html=True)
+
                     c1, c2, c3, c4, c5, c_voto = st.columns([0.9, 1.4, 1.0, 1.0, 1.0, 1.0])
                     with c1:
                         minuti = st.number_input("Minuti", 0, 80, int(current_vals.get("minuti", 80)), key=f"min_{partita_sel}_{i}")
@@ -1643,6 +1735,8 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                         "parate_decisive": parate_dec,
                         "gol_subiti": gol_sub,
                         "errori_gravi": errori_p,
+                        "ammonito": bool(amm_val),
+                        "espulso": bool(esp_val),
                     }
                     voto_live = calcola_voto(temp_dict, is_portiere=True)
                     voto_live_txt = str(voto_live) if voto_live is not None else "N.D."
@@ -1658,13 +1752,25 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                         val_ruolo = "CC"
                     area_gioco_label = get_etichetta_area(val_ruolo)
 
-                    c_gioc, c_ruolo = st.columns([2.4, 1.0])
+                    c_gioc, c_amm_chk, c_amm_dot, c_esp_chk, c_esp_dot, c_ruolo = st.columns([2.2, 0.75, 0.25, 0.75, 0.25, 1.0])
                     with c_gioc:
                         st.markdown(
                             f"<div style='padding-top: 6px;'><strong>N° {i} — {nome_g}</strong>"
                             f"<span class='scoutai-area-badge'>{area_gioco_label}</span></div>",
                             unsafe_allow_html=True
                         )
+                    with c_amm_chk:
+                        amm_val = st.checkbox("Amm.", value=fp_curr["ammonito"], key=f"amm_{partita_sel}_{i}")
+                    with c_amm_dot:
+                        col_dot_a = "#eab308" if amm_val else "rgba(148,163,184,0.22)"
+                        glow_dot_a = "box-shadow:0 0 8px #eab308;" if amm_val else ""
+                        st.markdown(f"<span class='scoutai-fp-dot' style='background:{col_dot_a};{glow_dot_a}' title='Stato Ammonizione'></span>", unsafe_allow_html=True)
+                    with c_esp_chk:
+                        esp_val = st.checkbox("Esp.", value=fp_curr["espulso"], key=f"esp_{partita_sel}_{i}")
+                    with c_esp_dot:
+                        col_dot_e = "#ef4444" if esp_val else "rgba(148,163,184,0.22)"
+                        glow_dot_e = "box-shadow:0 0 8px #ef4444;" if esp_val else ""
+                        st.markdown(f"<span class='scoutai-fp-dot' style='background:{col_dot_e};{glow_dot_e}' title='Stato Espulsione (-1 voto)'></span>", unsafe_allow_html=True)
                     with c_ruolo:
                         idx_ruolo = TUTTI_RUOLI_MOVIMENTO.index(val_ruolo)
                         ruolo_campo = st.selectbox("Ruolo", TUTTI_RUOLI_MOVIMENTO, index=idx_ruolo, key=f"ruolo_{partita_sel}_{i}", label_visibility="collapsed")
@@ -1693,6 +1799,8 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                         "gol_fatti": gol_fatti,
                         "assist": assist,
                         "errori_gravi": errori_gravi,
+                        "ammonito": bool(amm_val),
+                        "espulso": bool(esp_val),
                     }
                     voto_live = calcola_voto(temp_dict, is_portiere=False)
                     voto_live_txt = str(voto_live) if voto_live is not None else "N.D."
@@ -1715,13 +1823,30 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 is_portiere = (i == 12)
                 default_ruolo_g = ruolo_default_da_rosa(db_giocatori.get(nome_g, {}).get("ruolo", ""))
                 current_vals = p_dati["dati_prestazione"].get(nome_g, {})
+                fp_curr = estrai_fairplay_compat(current_vals)
 
                 if is_portiere:
                     dp_curr = estrai_dati_portiere_compat(current_vals)
-                    st.markdown(
-                        f"**N° {i} — {nome_g} (Riserva)** <span class='scoutai-area-badge'>Porta</span>",
-                        unsafe_allow_html=True
-                    )
+                    c_gioc, c_amm_chk, c_amm_dot, c_esp_chk, c_esp_dot = st.columns([2.2, 0.8, 0.25, 0.8, 0.25])
+                    with c_gioc:
+                        st.markdown(
+                            f"<div style='padding-top:6px;'><strong>N° {i} — {nome_g} (Riserva)</strong>"
+                            f"<span class='scoutai-area-badge'>Porta</span></div>",
+                            unsafe_allow_html=True
+                        )
+                    with c_amm_chk:
+                        amm_val = st.checkbox("Amm.", value=fp_curr["ammonito"], key=f"amm_res_{partita_sel}_{i}")
+                    with c_amm_dot:
+                        col_dot_a = "#eab308" if amm_val else "rgba(148,163,184,0.22)"
+                        glow_dot_a = "box-shadow:0 0 8px #eab308;" if amm_val else ""
+                        st.markdown(f"<span class='scoutai-fp-dot' style='background:{col_dot_a};{glow_dot_a}' title='Stato Ammonizione'></span>", unsafe_allow_html=True)
+                    with c_esp_chk:
+                        esp_val = st.checkbox("Esp.", value=fp_curr["espulso"], key=f"esp_res_{partita_sel}_{i}")
+                    with c_esp_dot:
+                        col_dot_e = "#ef4444" if esp_val else "rgba(148,163,184,0.22)"
+                        glow_dot_e = "box-shadow:0 0 8px #ef4444;" if esp_val else ""
+                        st.markdown(f"<span class='scoutai-fp-dot' style='background:{col_dot_e};{glow_dot_e}' title='Stato Espulsione (-1 voto)'></span>", unsafe_allow_html=True)
+
                     c1, c2, c3, c4, c5, c_voto = st.columns([0.9, 1.4, 1.0, 1.0, 1.0, 1.0])
                     with c1:
                         minuti = st.number_input("Min sub", 0, 80, int(current_vals.get("minuti", 0)), key=f"min_res_{partita_sel}_{i}")
@@ -1741,6 +1866,8 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                         "parate_decisive": parate_dec,
                         "gol_subiti": gol_sub,
                         "errori_gravi": errori_p,
+                        "ammonito": bool(amm_val),
+                        "espulso": bool(esp_val),
                     }
                     voto_live_res = calcola_voto(temp_dict_res, is_portiere=True)
                     voto_live_res_txt = str(voto_live_res) if voto_live_res is not None else "N.D."
@@ -1756,13 +1883,25 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                         val_ruolo = "CC"
                     area_gioco_label = get_etichetta_area(val_ruolo)
 
-                    c_gioc, c_ruolo = st.columns([2.4, 1.0])
+                    c_gioc, c_amm_chk, c_amm_dot, c_esp_chk, c_esp_dot, c_ruolo = st.columns([2.2, 0.75, 0.25, 0.75, 0.25, 1.0])
                     with c_gioc:
                         st.markdown(
                             f"<div style='padding-top: 6px;'><strong>N° {i} — {nome_g} (Riserva)</strong>"
                             f"<span class='scoutai-area-badge'>{area_gioco_label}</span></div>",
                             unsafe_allow_html=True
                         )
+                    with c_amm_chk:
+                        amm_val = st.checkbox("Amm.", value=fp_curr["ammonito"], key=f"amm_res_{partita_sel}_{i}")
+                    with c_amm_dot:
+                        col_dot_a = "#eab308" if amm_val else "rgba(148,163,184,0.22)"
+                        glow_dot_a = "box-shadow:0 0 8px #eab308;" if amm_val else ""
+                        st.markdown(f"<span class='scoutai-fp-dot' style='background:{col_dot_a};{glow_dot_a}' title='Stato Ammonizione'></span>", unsafe_allow_html=True)
+                    with c_esp_chk:
+                        esp_val = st.checkbox("Esp.", value=fp_curr["espulso"], key=f"esp_res_{partita_sel}_{i}")
+                    with c_esp_dot:
+                        col_dot_e = "#ef4444" if esp_val else "rgba(148,163,184,0.22)"
+                        glow_dot_e = "box-shadow:0 0 8px #ef4444;" if esp_val else ""
+                        st.markdown(f"<span class='scoutai-fp-dot' style='background:{col_dot_e};{glow_dot_e}' title='Stato Espulsione (-1 voto)'></span>", unsafe_allow_html=True)
                     with c_ruolo:
                         idx_ruolo = TUTTI_RUOLI_MOVIMENTO.index(val_ruolo)
                         ruolo_campo = st.selectbox("Ruolo", TUTTI_RUOLI_MOVIMENTO, index=idx_ruolo, key=f"ruolo_res_{partita_sel}_{i}", label_visibility="collapsed")
@@ -1791,6 +1930,8 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                         "gol_fatti": gol_fatti,
                         "assist": assist,
                         "errori_gravi": errori_gravi,
+                        "ammonito": bool(amm_val),
+                        "espulso": bool(esp_val),
                     }
                     voto_live_res = calcola_voto(temp_dict_res, is_portiere=False)
                     voto_live_res_txt = str(voto_live_res) if voto_live_res is not None else "N.D."
@@ -1828,6 +1969,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 is_portiere = (str(n) in ["1", "12"])
                 p_dati_g = p_dati["dati_prestazione"].get(nome, {})
                 voto = calcola_voto(p_dati_g, is_portiere)
+                fp = estrai_fairplay_compat(p_dati_g)
                 if is_portiere:
                     dp = estrai_dati_portiere_compat(p_dati_g)
                     righe_csv.append({
@@ -1839,6 +1981,8 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                         "Parate Decisive": dp["parate_decisive"],
                         "Gol Subiti": dp["gol_subiti"],
                         "Errori Gravi": dp["errori_gravi"],
+                        "Ammonito": "Si" if fp["ammonito"] else "No",
+                        "Espulso": "Si" if fp["espulso"] else "No",
                         "Voto": voto if voto is not None else "N.D."
                     })
                 else:
@@ -1855,6 +1999,8 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                         "Gol": dm["gol_fatti"],
                         "Assist": dm["assist"],
                         "Errori Gravi": dm["errori_gravi"],
+                        "Ammonito": "Si" if fp["ammonito"] else "No",
+                        "Espulso": "Si" if fp["espulso"] else "No",
                         "Voto": voto if voto is not None else "N.D."
                     })
 
@@ -2144,6 +2290,13 @@ elif menu == "📈 Riepilogo Squadra":
                     is_portiere = (str(n) in ["1", "12"])
                     ha_minuti = min_giocati > 0
                     voto_match = calcola_voto(d_p, is_portiere) if ha_minuti else None
+                    fp = estrai_fairplay_compat(d_p)
+                    fp_txt = []
+                    if fp["ammonito"]:
+                        fp_txt.append("🟡 Amm.")
+                    if fp["espulso"]:
+                        fp_txt.append("🔴 Esp.")
+                    fp_suffix = f" | {' · '.join(fp_txt)}" if fp_txt else ""
 
                     if ha_minuti and voto_match is not None:
                         storico_voti.append(voto_match)
@@ -2166,7 +2319,7 @@ elif menu == "📈 Riepilogo Squadra":
                         ruolo_match = "POR (Porta)"
                         parametri_str = (
                             f"Sicurezza: {dp['sicurezza_portiere']} | Parate dec.: {dp['parate_decisive']} | "
-                            f"Gol sub.: {dp['gol_subiti']} | Errori: {dp['errori_gravi']}"
+                            f"Gol sub.: {dp['gol_subiti']} | Errori: {dp['errori_gravi']}{fp_suffix}"
                         )
                     else:
                         ha_dati_movimento = True
@@ -2184,7 +2337,7 @@ elif menu == "📈 Riepilogo Squadra":
                         ruolo_match = f"{ruolo_c} ({get_etichetta_area(ruolo_c)})"
                         parametri_str = (
                             f"Impatto: {dm['impatto_partita']} | Palla/Duelli: {dm['gestione_palla']} | "
-                            f"Gol: {dm['gol_fatti']} | Assist: {dm['assist']} | Errori: {dm['errori_gravi']}"
+                            f"Gol: {dm['gol_fatti']} | Assist: {dm['assist']} | Errori: {dm['errori_gravi']}{fp_suffix}"
                         )
 
                     tipo_presenza = "Titolare" if 1 <= num_maglia <= 11 else ("Subentro" if 12 <= num_maglia <= 20 else "Rosa")
@@ -2647,7 +2800,115 @@ elif menu == "📊 Grafici & Analisi Visiva":
             st.markdown("</div>", unsafe_allow_html=True)
 
 # =====================================================================
-# 6. GESTIONE ROSA
+# 6. FAIR PLAY (AMMONIZIONI & ESPULSIONI)
+# =====================================================================
+elif menu == "🟨 Fair Play":
+    st.title("🟨 Fair Play — Ammonizioni & Espulsioni")
+    st.caption(
+        "Riepilogo delle spunte **Ammonizione** ed **Espulsione** inserite nei parametri di gara. "
+        "L'ammonizione è segnalata in **giallo**, l'espulsione in **rosso** e incide sul voto con un **-1.0**."
+    )
+
+    partite_ordinate_fp = sorted(
+        db_partite.items(),
+        key=lambda item: parse_data_partita(item[1].get("data", "01/01/2026"))
+    )
+
+    tot_amm_stag = 0
+    tot_esp_stag = 0
+    riepilogo_giocatori_fp = {
+        nome_g: {"Giocatore": nome_g, "Ruolo": dati_g.get("ruolo", "-"), "Ammonizioni": 0, "Espulsioni": 0, "Penalità Voto": 0.0, "Partite Sanzionate": []}
+        for nome_g, dati_g in db_giocatori.items()
+    }
+    dettaglio_match_fp = []
+
+    for p_nome, p_val in partite_ordinate_fp:
+        amm_match = 0
+        esp_match = 0
+        sanzionati_match = []
+
+        for n, nome in p_val.get("formazione", {}).items():
+            if not nome:
+                continue
+            d_p = p_val.get("dati_prestazione", {}).get(nome, {})
+            if not d_p:
+                continue
+            fp = estrai_fairplay_compat(d_p)
+            if not fp["ammonito"] and not fp["espulso"]:
+                continue
+
+            if nome not in riepilogo_giocatori_fp:
+                riepilogo_giocatori_fp[nome] = {
+                    "Giocatore": nome,
+                    "Ruolo": db_giocatori.get(nome, {}).get("ruolo", "-"),
+                    "Ammonizioni": 0,
+                    "Espulsioni": 0,
+                    "Penalità Voto": 0.0,
+                    "Partite Sanzionate": []
+                }
+
+            etichette_g = []
+            if fp["ammonito"]:
+                amm_match += 1
+                tot_amm_stag += 1
+                riepilogo_giocatori_fp[nome]["Ammonizioni"] += 1
+                etichette_g.append("🟡 Ammonito")
+            if fp["espulso"]:
+                esp_match += 1
+                tot_esp_stag += 1
+                riepilogo_giocatori_fp[nome]["Espulsioni"] += 1
+                riepilogo_giocatori_fp[nome]["Penalità Voto"] = round(riepilogo_giocatori_fp[nome]["Penalità Voto"] - 1.0, 1)
+                etichette_g.append("🔴 Espulso (-1)")
+
+            riepilogo_giocatori_fp[nome]["Partite Sanzionate"].append(f"{p_nome} ({', '.join(etichette_g)})")
+            sanzionati_match.append(f"{nome} [{' / '.join(etichette_g)}]")
+
+        if amm_match > 0 or esp_match > 0:
+            dettaglio_match_fp.append({
+                "Partita": p_nome,
+                "Data": p_val.get("data", "N.D."),
+                "Ammonizioni": amm_match,
+                "Espulsioni": esp_match,
+                "Giocatori Sanzionati": ", ".join(sanzionati_match)
+            })
+
+    c_fp1, c_fp2, c_fp3 = st.columns(3)
+    c_fp1.metric("🟡 Ammonizioni Totali", tot_amm_stag)
+    c_fp2.metric("🔴 Espulsioni Totali", tot_esp_stag)
+    c_fp3.metric("📉 Impatto Totale Espulsioni", f"{-1.0 * tot_esp_stag:.1f} pt" if tot_esp_stag > 0 else "0.0 pt")
+
+    st.divider()
+    st.subheader("👤 Riepilogo Giocatori")
+    righe_g_fp = []
+    for rec in riepilogo_giocatori_fp.values():
+        if rec["Ammonizioni"] > 0 or rec["Espulsioni"] > 0:
+            righe_g_fp.append({
+                "Giocatore": rec["Giocatore"],
+                "Ruolo": rec["Ruolo"],
+                "🟡 Ammonizioni": rec["Ammonizioni"],
+                "🔴 Espulsioni": rec["Espulsioni"],
+                "Impatto Espulsioni": f"{rec['Penalità Voto']:.1f}" if rec["Penalità Voto"] < 0 else "0.0",
+                "Dettaglio Gare": " ; ".join(rec["Partite Sanzionate"])
+            })
+
+    if righe_g_fp:
+        df_g_fp = pd.DataFrame(righe_g_fp).sort_values(
+            by=["🔴 Espulsioni", "🟡 Ammonizioni", "Giocatore"],
+            ascending=[False, False, True]
+        )
+        st.table(df_g_fp)
+    else:
+        st.info("Nessuna ammonizione o espulsione spuntata finora nei parametri delle partite.")
+
+    st.divider()
+    st.subheader("🗓️ Dettaglio per Partita")
+    if dettaglio_match_fp:
+        st.table(pd.DataFrame(dettaglio_match_fp))
+    else:
+        st.info("Nessuna partita con cartellini registrati.")
+
+# =====================================================================
+# 7. GESTIONE ROSA
 # =====================================================================
 elif menu == "👤 Gestione Rosa":
     st.title("👤 Gestione Rosa Squadra")
@@ -2806,7 +3067,7 @@ elif menu == "👤 Gestione Rosa":
                                 st.rerun()
 
 # =====================================================================
-# 7. EDITOR GRAFICA & SETTINGS
+# 8. EDITOR GRAFICA & SETTINGS
 # =====================================================================
 elif menu == "🎨 Editor Grafica":
     st.title("🎨 Editor Grafica & Impostazioni UI")
@@ -2895,7 +3156,7 @@ elif menu == "🎨 Editor Grafica":
         st.rerun()
 
 # =====================================================================
-# 8. PANNELLO ADMIN
+# 9. PANNELLO ADMIN
 # =====================================================================
 elif menu == "🛡️ Pannello Admin":
     if not st.session_state.get("is_admin", False):
