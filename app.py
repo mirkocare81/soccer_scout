@@ -6,7 +6,9 @@ import time
 import os
 import json
 import re
+import base64
 import hashlib
+import requests
 from datetime import datetime
 
 # Import protetto di ReportLab (se non installato, l'app non va in crash)
@@ -213,7 +215,7 @@ def calcola_media_giudizio(valori, opzioni, scala):
     """Restituisce l'etichetta media su scala ordinata."""
     if not valori:
         return "N.D."
-    media_val = sum(scala[v] for v in valori if v in scala) / len(valori)
+    media_val = sum(scala[v] for v in valori if v in scala) / len(vori)
     return min(opzioni, key=lambda k: abs(scala[k] - media_val))
 
 def get_macro_ruolo(ruolo_specifico):
@@ -383,7 +385,7 @@ def hex_to_rgba(hex_color, alpha):
     return f"rgba({r}, {g}, {b}, {alpha_clamped:.2f})"
 
 # =====================================================================
-# GESTIONE LOGO, IMMAGINE HOME, FOTO GIOCATORI, SICUREZZA & FILE JSON
+# GESTIONE LOGO, IMMAGINE HOME, FOTO GIOCATORI, SICUREZZA & SYNC GITHUB
 # =====================================================================
 LOGO_PATH = "Channel logo.jpg" if os.path.exists("Channel logo.jpg") else ("logo.png" if os.path.exists("logo.png") else None)
 HOME_IMAGE_PATH = "eagle.jpg" if os.path.exists("eagle.jpg") else ("eagle.png" if os.path.exists("eagle.png") else None)
@@ -472,17 +474,114 @@ def applica_payload_database(payload):
     salva_dati_su_disco()
     return True, f"Backup importato: {len(giocatori_imp)} giocatori e {len(partite_imp)} partite ripristinati."
 
-def salva_dati_su_disco():
-    """Salvataggio automatico istantaneo su file JSON"""
+def _get_github_sync_cfg():
+    """Legge la configurazione [github_sync] da st.secrets se presente e completa."""
     try:
-        data_to_save = costruisci_payload_database()
+        cfg = st.secrets.get("github_sync", {})
+    except Exception:
+        return None
+    if not cfg:
+        return None
+    token = str(cfg.get("token", "")).strip()
+    owner = str(cfg.get("owner", "")).strip()
+    repo = str(cfg.get("repo", "")).strip()
+    path = str(cfg.get("path", "scoutai_state.json")).strip().lstrip("/")
+    branch = str(cfg.get("branch", "main")).strip()
+    if not (token and owner and repo and path):
+        return None
+    return {
+        "token": token,
+        "owner": owner,
+        "repo": repo,
+        "path": path,
+        "branch": branch,
+    }
+
+def _github_headers(token):
+    return {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+
+def _leggi_json_github(cfg):
+    """Restituisce (payload_dict, sha_str) oppure (None, None) se il file non esiste ancora."""
+    url = f"https://api.github.com/repos/{cfg['owner']}/{cfg['repo']}/contents/{cfg['path']}"
+    resp = requests.get(
+        url,
+        headers=_github_headers(cfg["token"]),
+        params={"ref": cfg["branch"]},
+        timeout=15,
+    )
+    if resp.status_code == 404:
+        return None, None
+    resp.raise_for_status()
+
+    body = resp.json()
+    sha = body.get("sha")
+    raw_b64 = (body.get("content") or "").replace("\n", "")
+    if not raw_b64:
+        return None, sha
+    decoded_text = base64.b64decode(raw_b64).decode("utf-8")
+    return json.loads(decoded_text), sha
+
+def _scrivi_json_github(cfg, payload_dict, commit_message="Aggiorna stato ScoutAI"):
+    """Crea o aggiorna il file JSON su GitHub; in caso di 409/422 rilegge lo SHA più recente e ritenta."""
+    url = f"https://api.github.com/repos/{cfg['owner']}/{cfg['repo']}/contents/{cfg['path']}"
+    json_bytes = json.dumps(payload_dict, ensure_ascii=False, indent=2).encode("utf-8")
+    encoded_content = base64.b64encode(json_bytes).decode("ascii")
+
+    _, sha = _leggi_json_github(cfg)
+    data = {
+        "message": commit_message,
+        "content": encoded_content,
+        "branch": cfg["branch"],
+    }
+    if sha:
+        data["sha"] = sha
+
+    resp = requests.put(url, headers=_github_headers(cfg["token"]), json=data, timeout=15)
+    if resp.status_code in (409, 422):
+        _, sha_aggiornato = _leggi_json_github(cfg)
+        if sha_aggiornato:
+            data["sha"] = sha_aggiornato
+        else:
+            data.pop("sha", None)
+        resp = requests.put(url, headers=_github_headers(cfg["token"]), json=data, timeout=15)
+
+    resp.raise_for_status()
+
+def salva_dati_su_disco():
+    """Salva lo stato in locale (se possibile) e lo sincronizza su GitHub se configurato in st.secrets."""
+    data_to_save = costruisci_payload_database()
+    try:
         with open(DB_FILE, "w", encoding="utf-8") as f:
             json.dump(data_to_save, f, ensure_ascii=False, indent=4)
     except Exception as e:
-        print(f"Errore durante il salvataggio automatico: {e}")
+        print(f"Errore durante il salvataggio locale: {e}")
+
+    gh_cfg = _get_github_sync_cfg()
+    if gh_cfg:
+        try:
+            _scrivi_json_github(
+                gh_cfg,
+                data_to_save,
+                commit_message=f"Sync stato ScoutAI ({datetime.now().strftime('%Y-%m-%d %H:%M')})",
+            )
+        except Exception as e:
+            print(f"Errore sincronizzazione GitHub: {e}")
 
 def carica_dati_da_disco():
-    """Caricamento dati da file JSON se esiste"""
+    """Carica il JSON di stato da GitHub se configurato in st.secrets, con fallback al file locale."""
+    gh_cfg = _get_github_sync_cfg()
+    if gh_cfg:
+        try:
+            payload_gh, _ = _leggi_json_github(gh_cfg)
+            if isinstance(payload_gh, dict):
+                return payload_gh
+        except Exception as e:
+            print(f"Errore lettura GitHub: {e}")
+
     if os.path.exists(DB_FILE):
         try:
             with open(DB_FILE, "r", encoding="utf-8") as f:
@@ -908,7 +1007,7 @@ if not st.session_state["home_entered"]:
         st.markdown(
             "<div class='scoutai-home-banner'>"
             "<div class='scoutai-home-kicker'>ScoutAI · Match Analysis</div>"
-            "<h1 class='scoutai-home-title'>Accedi ai dati stagionali dell'USO NUVOLENTO U16 - 2011</h1>"
+            "<h1 class='scoutai-home-title'>Benvenuti nella fortezza dei dati dell'USO NUVOLENTO - 2011</h1>"
             "</div>",
             unsafe_allow_html=True,
         )
@@ -1703,7 +1802,7 @@ elif menu == "⚡ Inserimento Parametri & Voti":
             if st.form_submit_button("💾 Salva Valutazioni e Calcola Voti"):
                 st.session_state["partita_attiva"] = partita_sel
                 salva_dati_su_disco()
-                st.success("Valutazioni salvate automaticamente su disco e voti aggiornati!")
+                st.success("Valutazioni salvate automaticamente e voti aggiornati!")
                 st.rerun()
 
         st.divider()
@@ -2839,7 +2938,7 @@ elif menu == "🛡️ Pannello Admin":
             auth_cfg["sezioni_ragazzi"] = sezioni_scelte if sezioni_scelte else ["🎥 Video Analisi", "📈 Riepilogo Squadra"]
             st.session_state["auth_config"] = auth_cfg
             salva_dati_su_disco()
-            st.success("Impostazioni di accesso salvate su disco!")
+            st.success("Impostazioni di accesso salvate!")
             st.rerun()
 
     st.divider()
@@ -2849,7 +2948,7 @@ elif menu == "🛡️ Pannello Admin":
         auth_cfg["applica_nascoste_ad_admin"] = nascondi_admin_adm
         st.session_state["auth_config"] = auth_cfg
         salva_dati_su_disco()
-        st.success("Visibilità delle schede salvata su disco!")
+        st.success("Visibilità delle schede salvata!")
         st.rerun()
 
     st.divider()
