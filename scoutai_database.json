@@ -1,1 +1,362 @@
-
+{
+    "giocatori": {
+        "Mirko Bardelloni": {
+            "ruolo": "Esterno (EST)",
+            "partite": {},
+            "foto_path": null
+        },
+        "Andrea Bashmili": {
+            "ruolo": "Esterno (EST)",
+            "partite": {},
+            "foto_path": null
+        },
+        "Matteo Bignotti": {
+            "ruolo": "Terzino (TS/TD)",
+            "partite": {},
+            "foto_path": null
+        },
+        "Gabriele Buttarelli": {
+            "ruolo": "Esterno (EST)",
+            "partite": {},
+            "foto_path": null
+        },
+        "Lorenzo Carè": {
+            "ruolo": "Difensore centrale (DC)",
+            "partite": {},
+            "foto_path": null
+        },
+        "Antonio Cavuoto": {
+            "ruolo": "Centrocampista (CEN)",
+            "partite": {},
+            "foto_path": null
+        },
+        "Andrea Comai": {
+            "ruolo": "Esterno (EST)",
+            "partite": {},
+            "foto_path": null
+        },
+        "Edoardo Cominelli": {
+            "ruolo": "Portiere (POR)",
+            "partite": {},
+            "foto_path": null
+        },
+        "Samuele Cullè": {
+            "ruolo": "Portiere (POR)",
+            "partite": {},
+            "foto_path": null
+        },
+        "Michele Felice": {
+            "ruolo": "Centrocampista (CC)",
+            "partite": {},
+            "foto_path": null
+        },
+        "Alessandro Grande": {
+            "ruolo": "Centrocampista (CC)",
+            "partite": {},
+            "foto_path": null
+        },
+        "Ethan Greci": {
+            "ruolo": "Centrocampista (CC)",
+            "partite": {},
+            "foto_path": null
+        },
+        "Omar Gueye": {
+            "ruolo": "Esterno (EST)",
+            "partite": {},
+            "foto_path": null
+        },
+        "Matteo Lauro": {
+            "ruolo": "Esterno (EST)",
+            "partite": {},
+            "foto_path": null
+        },
+        "Cristian Manzoni": {
+            "ruolo": "Terzino (TS/TD)",
+            "partite": {},
+            "foto_path": null
+        },
+        "Mario Montanari": {
+            "ruolo": "Difensore centrale (DC)",
+            "partite": {},
+            "foto_path": null
+        },
+        "Giovanni Porricelli": {
+            "ruolo": "Difensore centrale (DC)",
+            "partite": {},
+            "foto_path": null
+        },
+        "Nicolò Scuri": {
+            "ruolo": "Difensore centrale (DC)",
+            "partite": {},
+            "foto_path": null
+        },
+        "Pietro Sguaizer": {
+            "ruolo": "Attaccante (ATT)",
+            "partite": {},
+            "foto_path": null
+        },
+        "Filippo Tobanelli": {
+            "ruolo": "Centrocampista (CC)",
+            "partite": {},
+            "foto_path": null
+        },
+        "Daniele Tonni": {
+            "ruolo": "Esterno (EST)",
+            "partite": {},
+            "foto_path": null
+        },
+        "Francesco Vita": {
+            "ruolo": "Centrocampista (CC)",
+            "partite": {},
+            "foto_path": null
+        },
+        "Marco Cau": {
+            "ruolo": "Portiere (POR)",
+            "partite": {},
+            "foto_path": null
+        }
+    },
+    "partite": {
+        "Bedizzole (22/11/2026)": {
+            "avversario": "Bedizzole",
+            "data": "22/11/2026",
+            "modulo": "4-3-3",
+            "risultato": "2-0",
+            "casa_trasferta": "Trasferta",
+            "youtube_link": "",
+            "formazione": {
+                "1": "Marco Cau",
+                "2": "Andrea Comai",
+                "3": "Matteo Bignotti",
+                "4": "Gabriele Buttarelli",
+                "5": "Lorenzo Carè",
+                "6": "Giovanni Porricelli",
+                "7": "Daniele Tonni",
+                "8": "Antonio Cavuoto",
+                "9": "Pietro Sguaizer",
+                "10": "Michele Felice",
+                "11": "Omar Gueye",
+                "12": "Samuele Cullè",
+                "13": "Mirko Bardelloni",
+                "14": "Alessandro Grande",
+                "15": "Cristian Manzoni",
+                "16": "Mario Montanari",
+                "17": "Nicolò Scuri",
+                "18": "Francesco Vita",
+                "19": "Edoardo Cominelli",
+                "20": ""
+            },
+            "dati_prestazione": {
+                "Marco Cau": {
+                    "minuti": 80,
+                    "sicurezza_portiere": "Affidabile",
+                    "parate_decisive": 3,
+                    "gol_subiti": 2,
+                    "errori_gravi": 1
+                },
+                "Andrea Comai": {
+                    "ruolo_campo": "TD",
+                    "minuti": 80,
+                    "impatto_partita": "Ordinato",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 1
+                },
+                "Matteo Bignotti": {
+                    "ruolo_campo": "TS",
+                    "minuti": 80,
+                    "impatto_partita": "Ordinato",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0
+                },
+                "Gabriele Buttarelli": {
+                    "ruolo_campo": "CC",
+                    "minuti": 70,
+                    "impatto_partita": "Ordinato",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0
+                },
+                "Lorenzo Carè": {
+                    "ruolo_campo": "DC",
+                    "minuti": 80,
+                    "impatto_partita": "Positivo",
+                    "gestione_palla": "Dominante",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0
+                },
+                "Giovanni Porricelli": {
+                    "ruolo_campo": "DC",
+                    "minuti": 80,
+                    "impatto_partita": "Positivo",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0
+                },
+                "Daniele Tonni": {
+                    "ruolo_campo": "AD",
+                    "minuti": 55,
+                    "impatto_partita": "Ordinato",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0
+                },
+                "Antonio Cavuoto": {
+                    "ruolo_campo": "CC",
+                    "minuti": 80,
+                    "impatto_partita": "Ordinato",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0
+                },
+                "Pietro Sguaizer": {
+                    "ruolo_campo": "AT",
+                    "minuti": 70,
+                    "impatto_partita": "Ordinato",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0
+                },
+                "Michele Felice": {
+                    "ruolo_campo": "TQ",
+                    "minuti": 60,
+                    "impatto_partita": "Ordinato",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0
+                },
+                "Omar Gueye": {
+                    "ruolo_campo": "AS",
+                    "minuti": 70,
+                    "impatto_partita": "Ordinato",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0
+                },
+                "Samuele Cullè": {
+                    "minuti": 0,
+                    "sicurezza_portiere": "Affidabile",
+                    "parate_decisive": 0,
+                    "gol_subiti": 0,
+                    "errori_gravi": 0
+                },
+                "Mirko Bardelloni": {
+                    "ruolo_campo": "AT",
+                    "minuti": 10,
+                    "impatto_partita": "Ordinato",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0
+                },
+                "Alessandro Grande": {
+                    "ruolo_campo": "CC",
+                    "minuti": 10,
+                    "impatto_partita": "Ordinato",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0
+                },
+                "Cristian Manzoni": {
+                    "ruolo_campo": "TD",
+                    "minuti": 25,
+                    "impatto_partita": "Positivo",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 1
+                },
+                "Mario Montanari": {
+                    "ruolo_campo": "DC",
+                    "minuti": 20,
+                    "impatto_partita": "Ordinato",
+                    "gestione_palla": "Altalenante",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0
+                },
+                "Nicolò Scuri": {
+                    "ruolo_campo": "DC",
+                    "minuti": 10,
+                    "impatto_partita": "Ordinato",
+                    "gestione_palla": "Altalenante",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0
+                },
+                "Francesco Vita": {
+                    "ruolo_campo": "CC",
+                    "minuti": 20,
+                    "impatto_partita": "Sottotono",
+                    "gestione_palla": "Altalenante",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0
+                },
+                "Edoardo Cominelli": {
+                    "ruolo_campo": "CC",
+                    "minuti": 10,
+                    "impatto_partita": "Ordinato",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0
+                }
+            }
+        }
+    },
+    "partita_attiva": "Bedizzole (22/11/2026)",
+    "ui_theme": {
+        "bg_main": "#070d19",
+        "bg_card": "#0f172a",
+        "bg_sidebar": "#0b1120",
+        "accent": "#3b82f6",
+        "text_color": "#f8fafc",
+        "border_color": "#1e293b",
+        "border_radius": 10,
+        "font_size": 16,
+        "shadow_intensity": 30,
+        "glow_intensity": 45,
+        "glow_width": 16,
+        "custom_css": ""
+    },
+    "fullscreen_mode": false,
+    "auth_config": {
+        "admin_pin_hash": "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4",
+        "read_only_boys": true,
+        "sezioni_ragazzi": [
+            "🎥 Video Analisi",
+            "📈 Riepilogo Squadra",
+            "📊 Grafici & Analisi Visiva"
+        ],
+        "schede_attive": [
+            "📋 Setup Partite & Formazioni",
+            "⚡ Inserimento Parametri & Voti",
+            "🎥 Video Analisi",
+            "📈 Riepilogo Squadra",
+            "📊 Grafici & Analisi Visiva",
+            "👤 Gestione Rosa",
+            "🎨 Editor Grafica"
+        ],
+        "applica_nascoste_ad_admin": false
+    },
+    "statistiche_accessi": {
+        "Mirko": {
+            "count": 5,
+            "ultimo_accesso": "23/11/2026 08:38"
+        }
+    },
+    "ultimo_utente_home": "Mirko"
+}
