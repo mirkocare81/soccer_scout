@@ -1213,9 +1213,465 @@
                     "espulso": false
                 }
             }
+        },
+        "Prevalle (03/10/2026)": {
+            "avversario": "Prevalle",
+            "data": "03/10/2026",
+            "modulo": "4-3-3",
+            "risultato": "4-1",
+            "casa_trasferta": "Trasferta",
+            "youtube_link": "",
+            "formazione": {
+                "1": "Edoardo Cominelli",
+                "2": "Matteo Bignotti",
+                "3": "Giovanni Porricelli",
+                "4": "Lorenzo Carè",
+                "5": "Mario Montanari",
+                "6": "Cristian Manzoni",
+                "7": "Antonio Cavuoto",
+                "8": "Matteo Lauro",
+                "9": "Pietro Sguaizer",
+                "10": "Michele Felice",
+                "11": "Andrea Bashmili",
+                "12": "Samuele Cullè",
+                "13": "Ethan Greci",
+                "14": "Filippo Tobanelli",
+                "15": "Alessandro Grande",
+                "16": "Gabriele Buttarelli",
+                "17": "Mirko Bardelloni",
+                "18": "Omar Gueye",
+                "19": "",
+                "20": ""
+            },
+            "dati_prestazione": {
+                "Edoardo Cominelli": {
+                    "minuti": 80,
+                    "sicurezza_portiere": "Altalenante",
+                    "parate_decisive": 1,
+                    "gol_subiti": 4,
+                    "errori_gravi": 1,
+                    "ammonito": false,
+                    "espulso": false
+                },
+                "Matteo Bignotti": {
+                    "ruolo_campo": "TS",
+                    "minuti": 80,
+                    "impatto_partita": "Sottotono",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0,
+                    "ammonito": false,
+                    "espulso": false
+                },
+                "Giovanni Porricelli": {
+                    "ruolo_campo": "DC",
+                    "minuti": 65,
+                    "impatto_partita": "Sottotono",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0,
+                    "ammonito": false,
+                    "espulso": false
+                },
+                "Lorenzo Carè": {
+                    "ruolo_campo": "DC",
+                    "minuti": 80,
+                    "impatto_partita": "Sottotono",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0,
+                    "ammonito": true,
+                    "espulso": false
+                },
+                "Mario Montanari": {
+                    "ruolo_campo": "TD",
+                    "minuti": 65,
+                    "impatto_partita": "Sottotono",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0,
+                    "ammonito": false,
+                    "espulso": false
+                },
+                "Cristian Manzoni": {
+                    "ruolo_campo": "TD",
+                    "minuti": 70,
+                    "impatto_partita": "Sottotono",
+                    "gestione_palla": "Altalenante",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0,
+                    "ammonito": false,
+                    "espulso": false
+                },
+                "Antonio Cavuoto": {
+                    "ruolo_campo": "CC",
+                    "minuti": 80,
+                    "impatto_partita": "Sottotono",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0,
+                    "ammonito": false,
+                    "espulso": false
+                },
+                "Matteo Lauro": {
+                    "ruolo_campo": "AD",
+                    "minuti": 40,
+                    "impatto_partita": "Sottotono",
+                    "gestione_palla": "Altalenante",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0,
+                    "ammonito": false,
+                    "espulso": false
+                },
+                "Pietro Sguaizer": {
+                    "ruolo_campo": "AT",
+                    "minuti": 80,
+                    "impatto_partita": "Sottotono",
+                    "gestione_palla": "Altalenante",
+                    "gol_fatti": 1,
+                    "assist": 0,
+                    "errori_gravi": 0,
+                    "ammonito": false,
+                    "espulso": false
+                },
+                "Michele Felice": {
+                    "ruolo_campo": "CC",
+                    "minuti": 60,
+                    "impatto_partita": "Sottotono",
+                    "gestione_palla": "Altalenante",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0,
+                    "ammonito": false,
+                    "espulso": false
+                },
+                "Andrea Bashmili": {
+                    "ruolo_campo": "AS",
+                    "minuti": 70,
+                    "impatto_partita": "Sottotono",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0,
+                    "ammonito": false,
+                    "espulso": false
+                },
+                "Samuele Cullè": {
+                    "minuti": 0,
+                    "sicurezza_portiere": "Affidabile",
+                    "parate_decisive": 0,
+                    "gol_subiti": 0,
+                    "errori_gravi": 0,
+                    "ammonito": false,
+                    "espulso": false
+                },
+                "Ethan Greci": {
+                    "ruolo_campo": "CC",
+                    "minuti": 40,
+                    "impatto_partita": "Ordinato",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0,
+                    "ammonito": false,
+                    "espulso": false
+                },
+                "Filippo Tobanelli": {
+                    "ruolo_campo": "CC",
+                    "minuti": 10,
+                    "impatto_partita": "Ordinato",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0,
+                    "ammonito": false,
+                    "espulso": false
+                },
+                "Alessandro Grande": {
+                    "ruolo_campo": "CC",
+                    "minuti": 20,
+                    "impatto_partita": "Ordinato",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0,
+                    "ammonito": true,
+                    "espulso": false
+                },
+                "Gabriele Buttarelli": {
+                    "ruolo_campo": "AT",
+                    "minuti": 15,
+                    "impatto_partita": "Sottotono",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0,
+                    "ammonito": false,
+                    "espulso": false
+                },
+                "Mirko Bardelloni": {
+                    "ruolo_campo": "AT",
+                    "minuti": 10,
+                    "impatto_partita": "Ordinato",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0,
+                    "ammonito": false,
+                    "espulso": false
+                },
+                "Omar Gueye": {
+                    "ruolo_campo": "AT",
+                    "minuti": 15,
+                    "impatto_partita": "Ordinato",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0,
+                    "ammonito": false,
+                    "espulso": false
+                }
+            },
+            "note_tattiche": "",
+            "stile_tattico": "4-3-3 Gegenpressing & Verticalità"
+        },
+        "Gavardo (19/09/2026)": {
+            "avversario": "Gavardo",
+            "data": "19/09/2026",
+            "modulo": "4-3-3",
+            "risultato": "0-1",
+            "casa_trasferta": "Trasferta",
+            "youtube_link": "",
+            "formazione": {
+                "1": "Edoardo Cominelli",
+                "2": "Mario Montanari",
+                "3": "Matteo Bignotti",
+                "4": "Antonio Cavuoto",
+                "5": "Lorenzo Carè",
+                "6": "Giovanni Porricelli",
+                "7": "Andrea Comai",
+                "8": "Michele Felice",
+                "9": "Pietro Sguaizer",
+                "10": "Ethan Greci",
+                "11": "Andrea Bashmili",
+                "12": "Samuele Cullè",
+                "13": "Daniele Tonni",
+                "14": "Alessandro Grande",
+                "15": "Matteo Lauro",
+                "16": "Gabriele Buttarelli",
+                "17": "Omar Gueye",
+                "18": "Mirko Bardelloni",
+                "19": "",
+                "20": ""
+            },
+            "dati_prestazione": {
+                "Edoardo Cominelli": {
+                    "minuti": 80,
+                    "sicurezza_portiere": "Dominante",
+                    "parate_decisive": 3,
+                    "gol_subiti": 0,
+                    "errori_gravi": 0,
+                    "ammonito": false,
+                    "espulso": false
+                },
+                "Mario Montanari": {
+                    "ruolo_campo": "DC",
+                    "minuti": 80,
+                    "impatto_partita": "Positivo",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0,
+                    "ammonito": false,
+                    "espulso": false
+                },
+                "Matteo Bignotti": {
+                    "ruolo_campo": "TD",
+                    "minuti": 80,
+                    "impatto_partita": "Positivo",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0,
+                    "ammonito": false,
+                    "espulso": false
+                },
+                "Antonio Cavuoto": {
+                    "ruolo_campo": "CC",
+                    "minuti": 80,
+                    "impatto_partita": "Positivo",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 1,
+                    "errori_gravi": 0,
+                    "ammonito": false,
+                    "espulso": false
+                },
+                "Lorenzo Carè": {
+                    "ruolo_campo": "DC",
+                    "minuti": 80,
+                    "impatto_partita": "Positivo",
+                    "gestione_palla": "Dominante",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0,
+                    "ammonito": true,
+                    "espulso": false
+                },
+                "Giovanni Porricelli": {
+                    "ruolo_campo": "DC",
+                    "minuti": 80,
+                    "impatto_partita": "Positivo",
+                    "gestione_palla": "Dominante",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0,
+                    "ammonito": false,
+                    "espulso": false
+                },
+                "Andrea Comai": {
+                    "ruolo_campo": "AD",
+                    "minuti": 60,
+                    "impatto_partita": "Ordinato",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0,
+                    "ammonito": false,
+                    "espulso": false
+                },
+                "Michele Felice": {
+                    "ruolo_campo": "CC",
+                    "minuti": 80,
+                    "impatto_partita": "Ordinato",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0,
+                    "ammonito": false,
+                    "espulso": false
+                },
+                "Pietro Sguaizer": {
+                    "ruolo_campo": "AT",
+                    "minuti": 80,
+                    "impatto_partita": "Positivo",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0,
+                    "ammonito": false,
+                    "espulso": false
+                },
+                "Ethan Greci": {
+                    "ruolo_campo": "CDC",
+                    "minuti": 40,
+                    "impatto_partita": "Sottotono",
+                    "gestione_palla": "Altalenante",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0,
+                    "ammonito": false,
+                    "espulso": false
+                },
+                "Andrea Bashmili": {
+                    "ruolo_campo": "AS",
+                    "minuti": 70,
+                    "impatto_partita": "Positivo",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 1,
+                    "assist": 0,
+                    "errori_gravi": 0,
+                    "ammonito": false,
+                    "espulso": false
+                },
+                "Samuele Cullè": {
+                    "minuti": 0,
+                    "sicurezza_portiere": "Affidabile",
+                    "parate_decisive": 0,
+                    "gol_subiti": 0,
+                    "errori_gravi": 0,
+                    "ammonito": false,
+                    "espulso": false
+                },
+                "Daniele Tonni": {
+                    "ruolo_campo": "CC",
+                    "minuti": 40,
+                    "impatto_partita": "Sottotono",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0,
+                    "ammonito": false,
+                    "espulso": false
+                },
+                "Alessandro Grande": {
+                    "ruolo_campo": "CC",
+                    "minuti": 0,
+                    "impatto_partita": "Ordinato",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0,
+                    "ammonito": false,
+                    "espulso": false
+                },
+                "Matteo Lauro": {
+                    "ruolo_campo": "AD",
+                    "minuti": 20,
+                    "impatto_partita": "Ordinato",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0,
+                    "ammonito": false,
+                    "espulso": false
+                },
+                "Gabriele Buttarelli": {
+                    "ruolo_campo": "AT",
+                    "minuti": 0,
+                    "impatto_partita": "Ordinato",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0,
+                    "ammonito": false,
+                    "espulso": false
+                },
+                "Omar Gueye": {
+                    "ruolo_campo": "AT",
+                    "minuti": 0,
+                    "impatto_partita": "Ordinato",
+                    "gestione_palla": "Pulita",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 0,
+                    "ammonito": false,
+                    "espulso": false
+                },
+                "Mirko Bardelloni": {
+                    "ruolo_campo": "AT",
+                    "minuti": 10,
+                    "impatto_partita": "Ordinato",
+                    "gestione_palla": "Altalenante",
+                    "gol_fatti": 0,
+                    "assist": 0,
+                    "errori_gravi": 1,
+                    "ammonito": false,
+                    "espulso": false
+                }
+            },
+            "note_tattiche": "",
+            "stile_tattico": "4-3-3 Gegenpressing & Verticalità"
         }
     },
-    "partita_attiva": "Feralpi Lonato (11/10/2026)",
+    "partita_attiva": "Gavardo (19/09/2026)",
     "ui_theme": {
         "bg_main": "#070d19",
         "bg_card": "#0f172a",
@@ -1238,13 +1694,15 @@
             "🎥 Video Analisi",
             "📈 Riepilogo Squadra",
             "📊 Grafici & Analisi Visiva",
-            "🟨 Fair Play"
+            "🟨 Fair Play",
+            "⚖️ Confronto Giocatori"
         ],
         "schede_attive": [
             "📋 Setup Partite & Formazioni",
             "⚡ Inserimento Parametri & Voti",
             "🎥 Video Analisi",
             "📈 Riepilogo Squadra",
+            "⚖️ Confronto Giocatori",
             "📊 Grafici & Analisi Visiva",
             "🟨 Fair Play",
             "👤 Gestione Rosa",
@@ -1254,8 +1712,8 @@
     },
     "statistiche_accessi": {
         "Mirko": {
-            "count": 6,
-            "ultimo_accesso": "23/11/2026 10:23"
+            "count": 11,
+            "ultimo_accesso": "24/11/2026 07:16"
         }
     },
     "ultimo_utente_home": "Mirko"
