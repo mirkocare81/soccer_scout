@@ -1503,6 +1503,19 @@ def genera_pdf_partita(match_name, match_data, db_giocatori, accent_hex):
 # =====================================================================
 # RENDER SVG LAVAGNA TATTICA
 # =====================================================================
+def _formatta_nome_lavagna(nome_raw: str) -> str:
+    nome = (nome_raw or "-").strip()
+    if not nome or nome == "-":
+        return "-"
+    if len(nome) <= 16:
+        return nome
+    parti = nome.split()
+    if len(parti) >= 2:
+        corto = f"{parti[0][0]}. {' '.join(parti[1:])}"
+        return corto if len(corto) <= 16 else corto[:15] + "…"
+    return nome[:15] + "…"
+
+
 def genera_svg_lavagna_tattica(modulo, nodi_campo, accent_hex, bg_card_hex):
     """Genera un campo da calcio verticale in SVG con i giocatori posizionati per ruolo."""
     modulo_use = modulo if modulo in COORDINATE_MODULI else "4-3-3"
@@ -1518,19 +1531,18 @@ def genera_svg_lavagna_tattica(modulo, nodi_campo, accent_hex, bg_card_hex):
         cx = 40 + (pos["x"] / 100.0) * 520
         cy = 48 + (pos["y"] / 100.0) * 764
         maglia = str(nodo.get("maglia", idx + 1))
-        nome_raw = str(nodo.get("nome") or "-")
-        nome_short = nome_raw if len(nome_raw) <= 14 else (nome_raw[:13] + "…")
+        nome_short = _formatta_nome_lavagna(str(nodo.get("nome") or "-"))
         ruolo_tag = str(nodo.get("ruolo") or pos["ruolo"])
         voto_val = nodo.get("voto")
         is_por = (ruolo_tag == "POR" or maglia == "1")
 
-        fill_maglia = "#f59e0b" if is_por else accent_hex
+        fill_maglia = "#f59e0b" if is_por else "#3b82f6"
         stroke_maglia = "#ffffff"
         badge_voto = ""
         if voto_val is not None:
             badge_voto = f"""
-            <rect x="{cx + 13:.1f}" y="{cy - 24:.1f}" width="28" height="16" rx="8" fill="#0f172a" stroke="{accent_hex}" stroke-width="1.2"/>
-            <text x="{cx + 27:.1f}" y="{cy - 13:.1f}" text-anchor="middle" fill="#ffffff" font-family="sans-serif" font-size="10" font-weight="700">{voto_val}</text>
+            <rect x="{cx + 13:.1f}" y="{cy - 24:.1f}" width="30" height="16" rx="8" fill="#0f172a" stroke="#3b82f6" stroke-width="1.2"/>
+            <text x="{cx + 28:.1f}" y="{cy - 13:.1f}" text-anchor="middle" fill="#ffffff" font-family="sans-serif" font-size="10" font-weight="700">{voto_val}</text>
             """
 
         cerchi_svg.append(f"""
@@ -1539,9 +1551,9 @@ def genera_svg_lavagna_tattica(modulo, nodi_campo, accent_hex, bg_card_hex):
             <circle cx="{cx:.1f}" cy="{cy:.1f}" r="20" fill="{fill_maglia}" stroke="{stroke_maglia}" stroke-width="2.2"/>
             <text x="{cx:.1f}" y="{cy + 5:.1f}" text-anchor="middle" fill="#ffffff" font-family="sans-serif" font-size="13" font-weight="800">{maglia}</text>
             {badge_voto}
-            <rect x="{cx - 48:.1f}" y="{cy + 24:.1f}" width="96" height="29" rx="7" fill="rgba(9, 10, 15, 0.88)" stroke="rgba(255,255,255,0.22)" stroke-width="1"/>
+            <rect x="{cx - 50:.1f}" y="{cy + 24:.1f}" width="100" height="29" rx="7" fill="rgba(9, 10, 15, 0.88)" stroke="rgba(255,255,255,0.22)" stroke-width="1"/>
             <text x="{cx:.1f}" y="{cy + 37:.1f}" text-anchor="middle" fill="#ffffff" font-family="sans-serif" font-size="11" font-weight="700">{nome_short}</text>
-            <text x="{cx:.1f}" y="{cy + 49:.1f}" text-anchor="middle" fill="{accent_hex}" font-family="sans-serif" font-size="9.5" font-weight="700">{ruolo_tag}</text>
+            <text x="{cx:.1f}" y="{cy + 49:.1f}" text-anchor="middle" fill="#60a5fa" font-family="sans-serif" font-size="9.5" font-weight="700">{ruolo_tag}</text>
         </g>
         """)
 
@@ -1555,7 +1567,7 @@ def genera_svg_lavagna_tattica(modulo, nodi_campo, accent_hex, bg_card_hex):
         max-width: 640px;
         margin: 0 auto;
     ">
-        <svg viewBox="0 0 600 860" width="100%" style="display:block; border-radius:10px;">
+        <svg viewBox="0 0 600 860" width="100%" style="display:block; border-radius:10px;" xmlns="http://www.w3.org/2000/svg">
             <defs>
                 <linearGradient id="pitchGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stop-color="#0f5132"/>
@@ -1590,8 +1602,8 @@ def genera_svg_lavagna_tattica(modulo, nodi_campo, accent_hex, bg_card_hex):
             <path d="M 244 706 A 64 64 0 0 1 356 706" fill="none" stroke="rgba(255,255,255,0.78)" stroke-width="2.2"/>
 
             <!-- Etichetta modulo in alto -->
-            <rect x="40" y="42" width="96" height="24" rx="6" fill="rgba(9,10,15,0.75)"/>
-            <text x="88" y="58" text-anchor="middle" fill="#ffffff" font-family="sans-serif" font-size="12" font-weight="800">MODULO {modulo_use}</text>
+            <rect x="40" y="42" width="108" height="24" rx="6" fill="rgba(9,10,15,0.75)"/>
+            <text x="94" y="58" text-anchor="middle" fill="#ffffff" font-family="sans-serif" font-size="12" font-weight="800">MODULO {modulo_use}</text>
 
             {''.join(cerchi_svg)}
         </svg>
@@ -1919,13 +1931,12 @@ elif menu == "🧲 Lavagna Tattica":
         maglie_usate = set()
 
         for idx_pos, pos_cfg in enumerate(layout_mod):
-            slot_pref = pos_cfg["slot"]
+            slot_pref = str(pos_cfg["slot"])
             if "_" in slot_pref:
-                slot_pref = pos_cfg.get("maglia_fallback", str(idx_pos + 1))
+                slot_pref = str(pos_cfg.get("maglia_fallback", idx_pos + 1))
 
-            # Se la maglia preferita è libera usala, altrimenti prendi la prima maglia 1..11 non ancora assegnata
-            if slot_pref not in maglie_usate and str(slot_pref) in [str(m) for m in range(1, 12)]:
-                maglia_num = str(slot_pref)
+            if slot_pref not in maglie_usate and slot_pref in {str(m) for m in range(1, 12)}:
+                maglia_num = slot_pref
             else:
                 maglia_num = next(
                     (str(m) for m in range(1, 12) if str(m) not in maglie_usate),
@@ -2016,7 +2027,7 @@ elif menu == "🧲 Lavagna Tattica":
 
     with col_campo:
         svg_html = genera_svg_lavagna_tattica(modulo_scelto, nodi_campo, accent_hex, tema["bg_card"])
-        st.markdown(svg_html, unsafe_allow_html=True)
+        components.html(svg_html, height=820, scrolling=False)
 
 # =====================================================================
 # 3. INSERIMENTO PARAMETRI & VOTI (MODELLO SNELLO & VISIVO + FAIR PLAY)
