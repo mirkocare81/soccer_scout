@@ -128,14 +128,14 @@
                 "1": "Marco Cau",
                 "2": "Andrea Comai",
                 "3": "Matteo Bignotti",
-                "4": "Gabriele Buttarelli",
+                "4": "Giovanni Porricelli",
                 "5": "Lorenzo Carè",
-                "6": "Giovanni Porricelli",
-                "7": "Daniele Tonni",
+                "6": "Gabriele Buttarelli",
+                "7": "Omar Gueye",
                 "8": "Antonio Cavuoto",
                 "9": "Pietro Sguaizer",
                 "10": "Michele Felice",
-                "11": "Omar Gueye",
+                "11": "Daniele Tonni",
                 "12": "Samuele Cullè",
                 "13": "Mirko Bardelloni",
                 "14": "Alessandro Grande",
@@ -352,7 +352,9 @@
                     "ammonito": false,
                     "espulso": false
                 }
-            }
+            },
+            "stile_tattico": "Difesa compatta & Contropiede rapido",
+            "note_tattiche": ""
         },
         "Sirmione (13/11/2026)": {
             "avversario": "Sirmione",
@@ -805,10 +807,10 @@
             "formazione": {
                 "1": "Samuele Cullè",
                 "2": "Antonio Cavuoto",
-                "3": "Matteo Bignotti",
-                "4": "Lorenzo Carè",
-                "5": "Daniele Tonni",
-                "6": "Mario Montanari",
+                "3": "Daniele Tonni",
+                "4": "Mario Montanari",
+                "5": "Matteo Bignotti",
+                "6": "Lorenzo Carè",
                 "7": "Andrea Comai",
                 "8": "Giovanni Porricelli",
                 "9": "Pietro Sguaizer",
@@ -1008,7 +1010,9 @@
                     "ammonito": false,
                     "espulso": false
                 }
-            }
+            },
+            "stile_tattico": "4-3-3 Gegenpressing & Verticalità",
+            "note_tattiche": ""
         },
         "Feralpi Lonato (11/10/2026)": {
             "avversario": "Feralpi Lonato",
@@ -1020,14 +1024,14 @@
             "formazione": {
                 "1": "Samuele Cullè",
                 "2": "Andrea Comai",
-                "3": "Matteo Bignotti",
-                "4": "Michele Felice",
+                "3": "Cristian Manzoni",
+                "4": "Matteo Bignotti",
                 "5": "Mario Montanari",
                 "6": "Lorenzo Carè",
-                "7": "Cristian Manzoni",
+                "7": "Mirko Bardelloni",
                 "8": "Alessandro Grande",
-                "9": "Mirko Bardelloni",
-                "10": "Ethan Greci",
+                "9": "Ethan Greci",
+                "10": "Michele Felice",
                 "11": "Omar Gueye",
                 "12": "Edoardo Cominelli",
                 "13": "Filippo Tobanelli",
@@ -1212,7 +1216,9 @@
                     "ammonito": true,
                     "espulso": false
                 }
-            }
+            },
+            "stile_tattico": "4-3-3 Gegenpressing & Verticalità",
+            "note_tattiche": ""
         },
         "Prevalle (03/10/2026)": {
             "avversario": "Prevalle",
@@ -1448,18 +1454,18 @@
             "modulo": "4-3-3",
             "risultato": "0-1",
             "casa_trasferta": "Trasferta",
-            "youtube_link": "",
+            "youtube_link": "https://youtu.be/_eRN07ChkjM?si=NB50RDalHT-wG0Kr",
             "formazione": {
                 "1": "Edoardo Cominelli",
                 "2": "Mario Montanari",
                 "3": "Matteo Bignotti",
-                "4": "Antonio Cavuoto",
+                "4": "Giovanni Porricelli",
                 "5": "Lorenzo Carè",
-                "6": "Giovanni Porricelli",
+                "6": "Ethan Greci",
                 "7": "Andrea Comai",
                 "8": "Michele Felice",
                 "9": "Pietro Sguaizer",
-                "10": "Ethan Greci",
+                "10": "Antonio Cavuoto",
                 "11": "Andrea Bashmili",
                 "12": "Samuele Cullè",
                 "13": "Daniele Tonni",
@@ -1671,7 +1677,7 @@
             "stile_tattico": "4-3-3 Gegenpressing & Verticalità"
         }
     },
-    "partita_attiva": "Gavardo (19/09/2026)",
+    "partita_attiva": "Flero (24/10/2026)",
     "ui_theme": {
         "bg_main": "#070d19",
         "bg_card": "#0f172a",
@@ -1682,7 +1688,7 @@
         "border_radius": 10,
         "font_size": 16,
         "shadow_intensity": 30,
-        "glow_intensity": 45,
+        "glow_intensity": 30,
         "glow_width": 16,
         "custom_css": ""
     },
