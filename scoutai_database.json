@@ -175,7 +175,7 @@
                     "gol_fatti": 0,
                     "assist": 0,
                     "errori_gravi": 0,
-                    "ammonito": true,
+                    "ammonito": false,
                     "espulso": false
                 },
                 "Gabriele Buttarelli": {
@@ -300,11 +300,11 @@
                 "Cristian Manzoni": {
                     "ruolo_campo": "TD",
                     "minuti": 25,
-                    "impatto_partita": "Positivo",
+                    "impatto_partita": "Ordinato",
                     "gestione_palla": "Pulita",
                     "gol_fatti": 0,
                     "assist": 0,
-                    "errori_gravi": 0,
+                    "errori_gravi": 1,
                     "ammonito": false,
                     "espulso": false
                 },
@@ -1677,7 +1677,7 @@
             "stile_tattico": "4-3-3 Gegenpressing & Verticalità"
         }
     },
-    "partita_attiva": "Flero (24/10/2026)",
+    "partita_attiva": "Bedizzole (22/11/2026)",
     "ui_theme": {
         "bg_main": "#070d19",
         "bg_card": "#0f172a",
@@ -1719,8 +1719,12 @@
     },
     "statistiche_accessi": {
         "Mirko": {
-            "count": 14,
-            "ultimo_accesso": "25/11/2026 14:27"
+            "count": 15,
+            "ultimo_accesso": "25/11/2026 15:19"
+        },
+        "Mr. Alessandro": {
+            "count": 3,
+            "ultimo_accesso": "25/11/2026 15:17"
         }
     },
     "ultimo_utente_home": "Mirko"
