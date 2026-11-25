@@ -1698,10 +1698,11 @@
         "read_only_boys": true,
         "sezioni_ragazzi": [
             "🎥 Video Analisi",
+            "⚡ Inserimento Parametri & Voti",
             "📈 Riepilogo Squadra",
             "📊 Grafici & Analisi Visiva",
-            "🟨 Fair Play",
-            "⚖️ Confronto Giocatori"
+            "⚖️ Confronto Giocatori",
+            "🟨 Fair Play"
         ],
         "schede_attive": [
             "📋 Setup Partite & Formazioni",
@@ -1718,8 +1719,8 @@
     },
     "statistiche_accessi": {
         "Mirko": {
-            "count": 11,
-            "ultimo_accesso": "24/11/2026 07:16"
+            "count": 14,
+            "ultimo_accesso": "25/11/2026 14:27"
         }
     },
     "ultimo_utente_home": "Mirko"
