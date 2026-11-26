@@ -1692,6 +1692,7 @@ with st.sidebar:
         st.caption(f"👤 Connesso come: **{utente_corrente_sb}** ({tot_u_sb} accessi)")
 
     if st.button("🏠 Schermata Home", use_container_width=True, key="btn_torna_home"):
+        st.session_state["video_in_riproduzione_id"] = None
         st.session_state["home_entered"] = False
         st.rerun()
 
@@ -1748,6 +1749,8 @@ with st.sidebar:
         sezioni_disponibili = ammesse_ragazzi
 
     menu = st.radio("Navigazione", sezioni_disponibili)
+    if menu != "🎬 Altri Video" and st.session_state.get("video_in_riproduzione_id") is not None:
+        st.session_state["video_in_riproduzione_id"] = None
 
 if is_sola_lettura():
     st.info("👀 **Modalità Sola Lettura (Ragazzi):** puoi consultare i dati condivisi senza modificare formazioni, voti, video o impostazioni.")
@@ -2618,10 +2621,14 @@ elif menu == "🎬 Altri Video":
 
     st.divider()
 
+    def _reset_player_on_filter_change():
+        st.session_state["video_in_riproduzione_id"] = None
+
     filtro_cat = st.selectbox(
         "Filtra per Categoria",
         options=["Tutte le categorie"] + categorie_disp,
-        key="filtro_cat_altri_video"
+        key="filtro_cat_altri_video",
+        on_change=_reset_player_on_filter_change
     )
 
     if "video_in_riproduzione_id" not in st.session_state:
@@ -2641,6 +2648,7 @@ elif menu == "🎬 Altri Video":
         )
         if vid_attivo:
             yt_act = vid_attivo.get("yt_id") or estrai_youtube_id(vid_attivo.get("url", ""))
+            autoplay_flag = 1 if st.session_state.pop("video_autoplay_once", False) else 0
             st.markdown(f"### ▶️ In riproduzione: {vid_attivo.get('titolo', 'Video')}")
             st.caption(f"Categoria: **{vid_attivo.get('categoria', 'Generale')}**" + (f" · {vid_attivo.get('nota')}" if vid_attivo.get("nota") else ""))
             if yt_act:
@@ -2658,7 +2666,7 @@ elif menu == "🎬 Altri Video":
                     ">
                         <div style="position: relative; width: 100%; aspect-ratio: 16 / 9; height: auto;">
                             <iframe
-                                src="https://www.youtube.com/embed/{yt_act}?autoplay=1"
+                                src="https://www.youtube.com/embed/{yt_act}?autoplay={autoplay_flag}"
                                 title="{vid_attivo.get('titolo', 'Video')}"
                                 style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; display: block;"
                                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -2706,6 +2714,7 @@ elif menu == "🎬 Altri Video":
                     with b_play:
                         if st.button("▶️ Apri", key=f"play_extra_{vid_id}_{idx_v}", use_container_width=True):
                             st.session_state["video_in_riproduzione_id"] = vid_id
+                            st.session_state["video_autoplay_once"] = True
                             st.rerun()
                     if not lettura_only:
                         with b_del:
