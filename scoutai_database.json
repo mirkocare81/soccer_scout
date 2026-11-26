@@ -1702,12 +1702,14 @@
             "📈 Riepilogo Squadra",
             "📊 Grafici & Analisi Visiva",
             "⚖️ Confronto Giocatori",
-            "🟨 Fair Play"
+            "🟨 Fair Play",
+            "🎬 Altri Video"
         ],
         "schede_attive": [
             "📋 Setup Partite & Formazioni",
             "⚡ Inserimento Parametri & Voti",
             "🎥 Video Analisi",
+            "🎬 Altri Video",
             "📈 Riepilogo Squadra",
             "⚖️ Confronto Giocatori",
             "📊 Grafici & Analisi Visiva",
@@ -1719,13 +1721,60 @@
     },
     "statistiche_accessi": {
         "Mirko": {
-            "count": 15,
-            "ultimo_accesso": "25/11/2026 15:19"
+            "count": 17,
+            "ultimo_accesso": "26/11/2026 13:35"
         },
         "Mr. Alessandro": {
             "count": 3,
             "ultimo_accesso": "25/11/2026 15:17"
         }
     },
-    "ultimo_utente_home": "Mirko"
+    "ultimo_utente_home": "Mirko",
+    "categorie_video": [
+        "Allenamenti",
+        "Clip Tattiche",
+        "Motivazione"
+    ],
+    "altri_video": [
+        {
+            "id": "vid_1795700294956_0",
+            "titolo": "Non si discute della giocata del compagno",
+            "categoria": "Motivazione",
+            "url": "https://youtu.be/5RXX-PiifXY?si=KfsBk03zr5MK5b8a",
+            "yt_id": "5RXX-PiifXY",
+            "nota": "Se un compagno fa una giocata non perfetta, non dobbiamo discuterla, dobbiamo risolverla."
+        },
+        {
+            "id": "vid_1795700366551_1",
+            "titolo": "Discorso motivazionale allo spogliatoio",
+            "categoria": "Motivazione",
+            "url": "https://youtu.be/D3RlxUbG8-0?si=c511rz54GhV8ijBL",
+            "yt_id": "D3RlxUbG8-0",
+            "nota": "Dobbiamo essere pronti a tutto per la squadra e peri nostri compagni!"
+        },
+        {
+            "id": "vid_1795700535504_2",
+            "titolo": "Parma - Roma 5-1 - Controllo e tiro di Malen",
+            "categoria": "Clip Tattiche",
+            "url": "https://youtu.be/VYJXPrHvggY?si=DB1E6JAceTCuLeLt",
+            "yt_id": "VYJXPrHvggY",
+            "nota": "Guardare bene il 1°controllo e tiro di collo di Malen - Minuto 1:40 del video"
+        },
+        {
+            "id": "vid_1795700670544_3",
+            "titolo": "Non mollare mai!",
+            "categoria": "Motivazione",
+            "url": "https://youtu.be/VUQzkj0YN_I?si=K8Ikdu85R-6qTvdY",
+            "yt_id": "VUQzkj0YN_I",
+            "nota": "Siete in grado di raggiungere qualsiasi risultato, se lo volete."
+        },
+        {
+            "id": "vid_1795701225417_4",
+            "titolo": "Impara ad essere più forte - Beast Mode",
+            "categoria": "Motivazione",
+            "url": "https://youtu.be/dydywvLmhyg?si=jeKiZEjoHahM7tso",
+            "yt_id": "dydywvLmhyg",
+            "nota": "Perchè il leone è il re della savana?"
+        }
+    ]
 }
