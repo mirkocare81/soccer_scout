@@ -2632,4 +2632,4 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                         "Giocatore": nome,
                         "Ruolo": ruolo_c,
                         "Area": get_etichetta_area(ruolo_c),
-                        "Minuti": p_dati
+                        "Minuti": p_dati}
