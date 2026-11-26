@@ -551,7 +551,7 @@ def applica_payload_database(payload):
         st.session_state["ui_theme"] = merged_theme
 
     if "fullscreen_mode" in payload:
-        st.session_state["fullscreen_mode"] = bool(payload["fullscreen_mode", False])
+        st.session_state["fullscreen_mode"] = bool(payload.get("fullscreen_mode", False))
 
     if isinstance(payload.get("auth_config"), dict) and payload["auth_config"]:
         cfg_imp = payload["auth_config"].copy()
@@ -844,6 +844,9 @@ if "categorie_video" not in st.session_state:
 if "altri_video" not in st.session_state:
     vids_init = dati_salvati.get("altri_video") if isinstance(dati_salvati, dict) else None
     st.session_state["altri_video"] = vids_init if isinstance(vids_init, list) else []
+
+if "video_in_riproduzione_id" not in st.session_state:
+    st.session_state["video_in_riproduzione_id"] = None
 
 if "utente_attivo" not in st.session_state:
     st.session_state["utente_attivo"] = ""
@@ -2070,8 +2073,8 @@ if menu == "📋 Setup Partite & Formazioni":
                         p_info["formazione"][str(i)] = st.selectbox(f"N° {i} ({label_ruolo})", opzioni_slot, index=idx_val, key=f"res_{i}_{partita_selezionata}")
 
                 if st.form_submit_button("Conferma e Salva Dati Partita"):
-                    p_info["avversario"] = nuovo_avv
-                    p_info["risultato"] = nuovo_risultato
+                    p_info["avversario"] = (nuovo_avv or "").strip()
+                    p_info["risultato"] = (nuovo_risultato or "N.D.").strip()
                     p_info["casa_trasferta"] = nuovo_ct
                     p_info["modulo"] = nuovo_modulo
                     st.session_state["partita_attiva"] = partita_selezionata
@@ -2707,10 +2710,14 @@ elif menu == "🎥 Video Analisi":
             )
         with col_btn:
             if st.button("📥 Carica Video", use_container_width=True, key=f"btn_carica_video_{partita_sel}"):
-                p_info["youtube_link"] = link_inserito.strip()
+                link_pulito = (link_inserito or "").strip()
+                p_info["youtube_link"] = link_pulito
                 st.session_state["partita_attiva"] = partita_sel
                 salva_dati_su_disco()
-                st.success("Video caricato e link salvato!")
+                if estrai_youtube_id(link_pulito):
+                    st.success("Video caricato e link salvato!")
+                else:
+                    st.warning("Link salvato, ma non sembra un URL YouTube valido per l'anteprima.")
                 st.rerun()
 
         st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
@@ -2988,6 +2995,9 @@ elif menu == "📈 Riepilogo Squadra":
     m_stag_cen = round(sum(voti_reparti_stagione["Centrocampo"]) / len(voti_reparti_stagione["Centrocampo"]), 1) if voti_reparti_stagione["Centrocampo"] else None
     m_stag_att = round(sum(voti_reparti_stagione["Attacco"]) / len(voti_reparti_stagione["Attacco"]), 1) if voti_reparti_stagione["Attacco"] else None
 
+    mvp_stag_att = calcola_mvp_stagione(db_partite, db_giocatori)
+    mvp_stag_nome = " & ".join(m["nome"] for m in mvp_stag_att) if mvp_stag_att else "N.D."
+
     col_sq_stag, col_rep1, col_rep2, col_rep3 = st.columns(4)
     with col_sq_stag:
         render_metric_box(
@@ -3009,6 +3019,9 @@ elif menu == "📈 Riepilogo Squadra":
             "⚡ Media Reparto Attacco",
             f"{m_stag_att} / 10" if m_stag_att is not None else "N.D."
         )
+
+    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+    render_metric_box("👑 MVP Stagionale Attuale", mvp_stag_nome)
 
     st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
@@ -4517,79 +4530,20 @@ elif menu == "🛡️ Pannello Admin":
     st.subheader("📊 Registro Accessi dalla Home")
     opzioni_reg = ottieni_opzioni_accesso_home(db_giocatori)
     stats_reg = st.session_state.get("statistiche_accessi", {})
-    righe_accessi = []
+    righe_reg = []
     for u_nome in opzioni_reg:
-        info_u = stats_reg.get(u_nome, {})
-        righe_accessi.append({
-            "Utente / Giocatore": u_nome,
-            "Accessi": int(info_u.get("count", 0)),
-            "Ultimo Accesso": info_u.get("ultimo_accesso") or "Mai",
+        rec = stats_reg.get(u_nome, {})
+        righe_reg.append({
+            "Utente": u_nome,
+            "Accessi": int(rec.get("count", 0)),
+            "Ultimo Accesso": rec.get("ultimo_accesso") or "Mai",
         })
-    df_accessi = pd.DataFrame(righe_accessi).sort_values(
-        by=["Accessi", "Utente / Giocatore"], ascending=[False, True]
-    )
-    st.table(df_accessi)
-
-    col_rst_singolo, col_rst_tutti = st.columns([2, 1.3])
-    with col_rst_singolo:
-        utente_reset = st.selectbox(
-            "Seleziona utente da azzerare",
-            options=opzioni_reg,
-            key="sel_utente_reset_accessi",
-            label_visibility="collapsed"
-        )
-        if st.button("🔄 Reset Contatore Accessi", use_container_width=True, key="btn_reset_singolo_accesso"):
-            st.session_state.setdefault("statistiche_accessi", {})[utente_reset] = {
-                "count": 0,
-                "ultimo_accesso": "Mai",
-            }
-            salva_dati_su_disco()
-            st.success(f"Contatore accessi resettato per {utente_reset}!")
-            st.rerun()
-
-    with col_rst_tutti:
-        st.markdown("<div style='height: 38px;'></div>", unsafe_allow_html=True)
-        if st.button("🗑️ Reset Tutti gli Accessi", use_container_width=True, key="btn_reset_accessi"):
-            st.session_state["statistiche_accessi"] = {}
-            salva_dati_su_disco()
-            st.success("Tutti i contatori accessi sono stati resettati!")
-            st.rerun()
-
-    st.divider()
-    st.subheader("🎬 Categorie per 'Altri Video'")
-    st.caption("Definisci le categorie con cui raggruppare i video extra non legati a partite.")
-
-    cats_attuali = st.session_state.get("categorie_video") or ["Allenamenti", "Clip Tattiche", "Motivazione"]
-    st.write("**Categorie attuali:** " + (", ".join(f"`{c}`" for c in cats_attuali)))
-
-    c_add_cat, c_del_cat = st.columns(2)
-    with c_add_cat:
-        nuova_cat_nome = st.text_input("Nuova categoria video", placeholder="Es. Palle inattive", key="input_nuova_cat_video")
-        if st.button("➕ Aggiungi Categoria", use_container_width=True, key="btn_add_cat_video"):
-            nome_pulito = (nuova_cat_nome or "").strip()
-            if not nome_pulito:
-                st.warning("Inserisci il nome della categoria.")
-            elif nome_pulito in cats_attuali:
-                st.info("Questa categoria esiste già.")
-            else:
-                cats_attuali.append(nome_pulito)
-                st.session_state["categorie_video"] = cats_attuali
-                salva_dati_su_disco()
-                st.success(f"Categoria '{nome_pulito}' aggiunta!")
-                st.rerun()
-
-    with c_del_cat:
-        cat_da_rim = st.selectbox("Categoria da rimuovere", options=cats_attuali, key="sel_del_cat_video")
-        if st.button("🗑️ Rimuovi Categoria", use_container_width=True, key="btn_del_cat_video"):
-            if len(cats_attuali) <= 1:
-                st.warning("Deve restare almeno una categoria.")
-            else:
-                cats_rimaste = [c for c in cats_attuali if c != cat_da_rim]
-                cat_fallback = cats_rimaste[0]
-                for v_item in st.session_state.get("altri_video", []):
-                    if v_item.get("categoria") == cat_da_rim:
-                        v_item["categoria"] = cat_fallback
-                st.session_state["categorie_video"] = cats_rimaste
-                salva_dati_su_disco()
-                st.success(f"Categoria '{cat_da_rim}' rimossa (video spostati su '{cat_fallback}').")
-                st.rerun()
+    for u_extra, rec in stats_reg.items():
+        if u_extra not in opzioni_reg:
+            righe_reg.append({
+                "Utente": u_extra,
+                "Accessi": int(rec.get("count", 0)),
+                "Ultimo Accesso": rec.get("ultimo_accesso") or "Mai",
+            })
+    if righe_reg:
+        st.table(pd.DataFrame(righe_reg).sort_values(by=["Accessi", "Utente"], ascending=[False, True]))
