@@ -187,6 +187,7 @@ TUTTE_LE_SCHEDE_APP = [
     "📈 Riepilogo Squadra",
     "⚖️ Confronto Giocatori",
     "📊 Grafici & Analisi Visiva",
+    "🏅 MVP",
     "🟨 Fair Play",
     "👤 Gestione Rosa",
     "🎨 Editor Grafica",
@@ -563,6 +564,7 @@ def applica_payload_database(payload):
             "📈 Riepilogo Squadra",
             "⚖️ Confronto Giocatori",
             "📊 Grafici & Analisi Visiva",
+            "🏅 MVP",
             "🟨 Fair Play",
         ])
         cfg_imp.setdefault("schede_attive", TUTTE_LE_SCHEDE_APP.copy())
@@ -712,6 +714,7 @@ def inizializza_sicurezza_ruoli(dati_salvati):
                 "📈 Riepilogo Squadra",
                 "⚖️ Confronto Giocatori",
                 "📊 Grafici & Analisi Visiva",
+                "🏅 MVP",
                 "🟨 Fair Play",
             ],
             "schede_attive": [
@@ -1394,6 +1397,176 @@ def calcola_statistiche_stagionali_giocatore(nome_giocatore, db_partite, db_gioc
         "serie_match": serie_match,
     }
 
+def calcola_mvp_partita(p_val, db_partite, db_giocatori):
+    """
+    Determina il/i giocatore/i MVP di una partita in base a:
+    1) Voto più alto (calcola_voto)
+    2) A parità di voto: punteggio/contributo netto ((gol + assist) - errori_gravi)
+    3) Ancora in parità: più gol, poi più assist, poi meno errori gravi
+    4) Ancora in parità: minor minutaggio nella partita
+    5) Ancora in parità: minor minutaggio stagionale
+    6) In caso di parità totale su tutti i criteri: restituisce tutti i giocatori a pari merito.
+    """
+    minuti_stag_map = {}
+    for _, p_item in db_partite.items():
+        for _, g_nome in p_item.get("formazione", {}).items():
+            if not g_nome:
+                continue
+            d_item = p_item.get("dati_prestazione", {}).get(g_nome, {})
+            if d_item:
+                minuti_stag_map[g_nome] = minuti_stag_map.get(g_nome, 0) + int(d_item.get("minuti", 0))
+
+    candidati = []
+    for n, nome in p_val.get("formazione", {}).items():
+        if not nome:
+            continue
+        d_p = p_val.get("dati_prestazione", {}).get(nome, {})
+        if not d_p:
+            continue
+        min_partita = int(d_p.get("minuti", 0))
+        if min_partita <= 0:
+            continue
+
+        is_portiere = (str(n) in ["1", "12"])
+        voto = calcola_voto(d_p, is_portiere=is_portiere)
+        if voto is None:
+            continue
+
+        if is_portiere or "sicurezza_portiere" in d_p or "parate_decisive" in d_p:
+            dp = estrai_dati_portiere_compat(d_p)
+            gol = 0
+            assist = dp["parate_decisive"]
+            errori = dp["errori_gravi"] + dp["gol_subiti"]
+            ruolo_lbl = "POR"
+        else:
+            dm = estrai_dati_movimento_compat(d_p)
+            gol = dm["gol_fatti"]
+            assist = dm["assist"]
+            errori = dm["errori_gravi"]
+            ruolo_lbl = d_p.get("ruolo_campo") or ruolo_default_da_rosa(db_giocatori.get(nome, {}).get("ruolo", ""))
+
+        punteggio_contributo = round((gol + assist) - errori, 2)
+        min_stag = int(minuti_stag_map.get(nome, min_partita))
+
+        candidati.append({
+            "nome": nome,
+            "maglia": str(n),
+            "ruolo": ruolo_lbl,
+            "voto": float(voto),
+            "punteggio_contributo": punteggio_contributo,
+            "gol": int(gol),
+            "assist": int(assist),
+            "errori": int(errori),
+            "min_partita": int(min_partita),
+            "min_stagione": min_stag,
+        })
+
+    if not candidati:
+        return []
+
+    def _chiave_tiebreak(c):
+        return (
+            -c["voto"],
+            -c["punteggio_contributo"],
+            -c["gol"],
+            -c["assist"],
+            c["errori"],
+            c["min_partita"],
+            c["min_stagione"],
+        )
+
+    migliore = min(candidati, key=_chiave_tiebreak)
+    chiave_migliore = _chiave_tiebreak(migliore)
+    return [c for c in candidati if _chiave_tiebreak(c) == chiave_migliore]
+
+
+def calcola_mvp_stagione(db_partite, db_giocatori):
+    """
+    Calcola l'MVP (o i pari merito totali) della stagione considerando:
+    1) Media voto stagionale più alta
+    2) Punteggio/contributo netto stagionale più alto ((gol + assist) - errori_gravi)
+    3) Più gol stagionali, poi più assist stagionali, poi meno errori gravi stagionali
+    4) Minor minutaggio stagionale totale
+    5) In caso di parità totale: restituisce tutti i giocatori a pari merito.
+    """
+    agg = {}
+    for _, p_val in db_partite.items():
+        for n, nome in p_val.get("formazione", {}).items():
+            if not nome:
+                continue
+            d_p = p_val.get("dati_prestazione", {}).get(nome, {})
+            if not d_p:
+                continue
+            min_p = int(d_p.get("minuti", 0))
+            if min_p <= 0:
+                continue
+
+            is_portiere = (str(n) in ["1", "12"])
+            voto = calcola_voto(d_p, is_portiere=is_portiere)
+            if voto is None:
+                continue
+
+            if nome not in agg:
+                agg[nome] = {
+                    "nome": nome,
+                    "ruolo": ruolo_default_da_rosa(db_giocatori.get(nome, {}).get("ruolo", "")),
+                    "voti": [],
+                    "gol": 0,
+                    "assist": 0,
+                    "errori": 0,
+                    "min_stagione": 0,
+                }
+
+            agg[nome]["voti"].append(float(voto))
+            agg[nome]["min_stagione"] += min_p
+
+            if is_portiere or "sicurezza_portiere" in d_p or "parate_decisive" in d_p:
+                dp = estrai_dati_portiere_compat(d_p)
+                agg[nome]["assist"] += int(dp["parate_decisive"])
+                agg[nome]["errori"] += int(dp["errori_gravi"] + dp["gol_subiti"])
+                agg[nome]["ruolo"] = "POR"
+            else:
+                dm = estrai_dati_movimento_compat(d_p)
+                agg[nome]["gol"] += int(dm["gol_fatti"])
+                agg[nome]["assist"] += int(dm["assist"])
+                agg[nome]["errori"] += int(dm["errori_gravi"])
+                rc = d_p.get("ruolo_campo")
+                if rc:
+                    agg[nome]["ruolo"] = rc
+
+    if not agg:
+        return []
+
+    candidati_stag = []
+    for rec in agg.values():
+        media_voto = round(sum(rec["voti"]) / len(rec["voti"]), 2)
+        punteggio_tot = round((rec["gol"] + rec["assist"]) - rec["errori"], 2)
+        candidati_stag.append({
+            "nome": rec["nome"],
+            "ruolo": rec["ruolo"],
+            "media_voto": media_voto,
+            "punteggio_contributo": punteggio_tot,
+            "gol": rec["gol"],
+            "assist": rec["assist"],
+            "errori": rec["errori"],
+            "min_stagione": rec["min_stagione"],
+        })
+
+    def _chiave_stag(c):
+        return (
+            -c["media_voto"],
+            -c["punteggio_contributo"],
+            -c["gol"],
+            -c["assist"],
+            c["errori"],
+            c["min_stagione"],
+        )
+
+    migliore = min(candidati_stag, key=_chiave_stag)
+    chiave_migliore = _chiave_stag(migliore)
+    return [c for c in candidati_stag if _chiave_stag(c) == chiave_migliore]
+
+
 # =====================================================================
 # GENERATORE PDF (OPZIONALE SE REPORTLAB È DISPONIBILE)
 # =====================================================================
@@ -1743,6 +1916,7 @@ with st.sidebar:
                     "📈 Riepilogo Squadra",
                     "⚖️ Confronto Giocatori",
                     "📊 Grafici & Analisi Visiva",
+                    "🏅 MVP",
                     "🟨 Fair Play",
                 ]
             ] or [schede_attive_cfg[0]]
@@ -3699,7 +3873,191 @@ elif menu == "📊 Grafici & Analisi Visiva":
             st.markdown("</div>", unsafe_allow_html=True)
 
 # =====================================================================
-# 8. FAIR PLAY (AMMONIZIONI & ESPULSIONI)
+# 8. MVP PER PARTITA & STAGIONE
+# =====================================================================
+elif menu == "🏅 MVP":
+    st.title("🏅 MVP di Partita & Stagione")
+    st.caption(
+        "Genera l'**MVP della stagione** dal pulsante in alto o consulta i box compatti per ogni partita "
+        "in base a **voto** e **punteggio contributi**, con spareggio su gol, assist, meno errori gravi e minor minutaggio (partita poi stagione), "
+        "oppure tutti i giocatori a pari merito in caso di parità totale."
+    )
+
+    if not db_partite:
+        st.warning("⚠️ Nessuna partita disponibile per calcolare gli MVP.")
+        st.stop()
+
+    if "mostra_popup_mvp_stagione" not in st.session_state:
+        st.session_state["mostra_popup_mvp_stagione"] = False
+
+    col_btn_mvp_s, _ = st.columns([1.4, 2.6])
+    with col_btn_mvp_s:
+        if st.button("🏆 Genera MVP della stagione", use_container_width=True, key="btn_genera_mvp_stagione"):
+            st.session_state["mostra_popup_mvp_stagione"] = True
+            st.rerun()
+
+    if st.session_state.get("mostra_popup_mvp_stagione"):
+        mvp_stag_list = calcola_mvp_stagione(db_partite, db_giocatori)
+        if not mvp_stag_list:
+            nomi_mvp_stag = "Nessun dato disponibile"
+            dettagli_mvp_stag = "Inserisci almeno una prestazione con minuti > 0 per calcolare l'MVP stagionale."
+            badge_stag_lbl = "MVP DELLA STAGIONE"
+        else:
+            badge_stag_lbl = "MVP DELLA STAGIONE · PARI MERITO" if len(mvp_stag_list) > 1 else "MVP DELLA STAGIONE"
+            nomi_mvp_stag = " & ".join(m["nome"] for m in mvp_stag_list)
+            dettagli_mvp_stag = " · ".join(
+                f"{m['nome']}: Media <strong>{m['media_voto']:.2f}</strong> · "
+                f"Gol <strong>{m['gol']}</strong> · Assist <strong>{m['assist']}</strong> · "
+                f"Err <strong>{m['errori']}</strong> · Score <strong>{m['punteggio_contributo']:+g}</strong> · "
+                f"Min <strong>{m['min_stagione']}'</strong>"
+                for m in mvp_stag_list
+            )
+
+        st.markdown(f"""
+        <div style="
+            background: linear-gradient(155deg, {tema['bg_card']} 0%, {tema['bg_main']} 100%);
+            border: 2px solid {accent_hex};
+            border-radius: {radius_px + 4}px;
+            padding: 34px 24px 28px 24px;
+            margin: 14px 0 14px 0;
+            box-shadow: 0 20px 46px rgba(0, 0, 0, 0.72), 0 0 {max(18, glow_larghezza_px + 8)}px {glow_rgba};
+            text-align: center;
+        ">
+            <div style="
+                font-size: 12px;
+                font-weight: 800;
+                letter-spacing: 2.2px;
+                text-transform: uppercase;
+                color: {accent_hex};
+                margin-bottom: 10px;
+            ">
+                {badge_stag_lbl}
+            </div>
+            <div style="
+                font-size: clamp(30px, 4.4vw, 48px);
+                font-weight: 900;
+                color: {tema['text_color']};
+                line-height: 1.15;
+                margin: 0 auto 14px auto;
+            ">
+                {nomi_mvp_stag}
+            </div>
+            <div style="
+                font-size: 82px;
+                line-height: 1.0;
+                margin: 4px auto 16px auto;
+                filter: drop-shadow(0 0 18px rgba(250, 204, 21, 0.55));
+            " title="Pallone d'Oro">
+                🟡
+            </div>
+            <div style="
+                font-size: 58px;
+                line-height: 1.0;
+                margin-top: -68px;
+                margin-bottom: 18px;
+                pointer-events: none;
+            ">
+                ⚽
+            </div>
+            <div style="
+                font-size: 13px;
+                color: #cbd5e1;
+                background-color: rgba(255, 255, 255, 0.03);
+                border: 1px solid {glow_border_rgba};
+                border-radius: {max(8, radius_px - 2)}px;
+                padding: 10px 14px;
+                display: inline-block;
+                max-width: 100%;
+            ">
+                {dettagli_mvp_stag}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        col_c_pop, _ = st.columns([1.2, 2.8])
+        with col_c_pop:
+            if st.button("✖️ Chiudi popup MVP stagione", use_container_width=True, key="btn_chiudi_popup_mvp_stag"):
+                st.session_state["mostra_popup_mvp_stagione"] = False
+                st.rerun()
+
+    st.divider()
+
+    partite_ordinate_mvp = sorted(
+        db_partite.items(),
+        key=lambda item: parse_data_partita(item[1].get("data", "01/01/2026"))
+    )
+
+    # Griglia compatta a 3 colonne: un box snello per ogni partita
+    for idx_m in range(0, len(partite_ordinate_mvp), 3):
+        cols_mvp = st.columns(3)
+        for j in range(3):
+            if idx_m + j >= len(partite_ordinate_mvp):
+                continue
+            p_nome, p_val = partite_ordinate_mvp[idx_m + j]
+            lista_mvp = calcola_mvp_partita(p_val, db_partite, db_giocatori)
+            data_m = p_val.get("data", "N.D.")
+            ris_m = p_val.get("risultato", "N.D.")
+
+            with cols_mvp[j]:
+                if not lista_mvp:
+                    st.markdown(f"""
+                    <div style="
+                        background-color: {tema['bg_card']};
+                        border: 1px solid {glow_border_rgba};
+                        border-radius: {radius_px}px;
+                        padding: 11px 13px;
+                        margin-bottom: 10px;
+                        box-shadow: {box_shadow_soft};
+                    ">
+                        <div style="font-weight:700; font-size:13px; color:{tema['text_color']};">⚽ {p_nome}</div>
+                        <div style="font-size:11px; color:#94a3b8; margin-top:2px;">{data_m} · Ris. {ris_m}</div>
+                        <div style="font-size:12px; color:#94a3b8; margin-top:6px;">MVP: <strong>N.D.</strong></div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    continue
+
+                ex_aequo = len(lista_mvp) > 1
+                badge_lbl = "PARI MERITO" if ex_aequo else "MVP"
+                righe_mvp_html = []
+                for m_item in lista_mvp:
+                    righe_mvp_html.append(f"""
+                    <div style="
+                        margin-top:5px;
+                        padding:6px 8px;
+                        border-radius:{max(6, radius_px-6)}px;
+                        background:rgba(255,255,255,0.03);
+                        border:1px solid {glow_border_rgba};
+                    ">
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+                            <span style="font-size:13px; font-weight:800; color:{tema['text_color']};">🏅 {m_item['nome']}</span>
+                            <span style="font-size:12px; font-weight:800; color:{accent_hex};">{m_item['voto']:.1f}</span>
+                        </div>
+                        <div style="font-size:11px; color:#cbd5e1; margin-top:2px;">
+                            Gol {m_item['gol']} · Ass {m_item['assist']} · Err {m_item['errori']} · Min {m_item['min_partita']}' (Stag {m_item['min_stagione']}')
+                        </div>
+                    </div>
+                    """)
+
+                st.markdown(f"""
+                <div style="
+                    background-color: {tema['bg_card']};
+                    border: 1px solid {accent_hex};
+                    border-radius: {radius_px}px;
+                    padding: 11px 13px;
+                    margin-bottom: 10px;
+                    box-shadow: {box_shadow_soft};
+                ">
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; border-bottom:1px solid {tema['border_color']}; padding-bottom:5px;">
+                        <div style="font-weight:700; font-size:13px; color:{tema['text_color']};">⚽ {p_nome}</div>
+                        <span style="font-size:10px; font-weight:800; color:{accent_hex}; text-transform:uppercase;">{badge_lbl}</span>
+                    </div>
+                    <div style="font-size:11px; color:#94a3b8; margin-top:4px;">{data_m} · Ris. <strong>{ris_m}</strong></div>
+                    {''.join(righe_mvp_html)}
+                </div>
+                """, unsafe_allow_html=True)
+
+# =====================================================================
+# 9. FAIR PLAY (AMMONIZIONI & ESPULSIONI)
 # =====================================================================
 elif menu == "🟨 Fair Play":
     st.title("🟨 Fair Play — Ammonizioni & Espulsioni")
@@ -3807,7 +4165,7 @@ elif menu == "🟨 Fair Play":
         st.info("Nessuna partita con cartellini registrati.")
 
 # =====================================================================
-# 9. GESTIONE ROSA
+# 10. GESTIONE ROSA
 # =====================================================================
 elif menu == "👤 Gestione Rosa":
     st.title("👤 Gestione Rosa Squadra")
@@ -3966,7 +4324,7 @@ elif menu == "👤 Gestione Rosa":
                                 st.rerun()
 
 # =====================================================================
-# 10. EDITOR GRAFICA & SETTINGS
+# 11. EDITOR GRAFICA & SETTINGS
 # =====================================================================
 elif menu == "🎨 Editor Grafica":
     st.title("🎨 Editor Grafica & Impostazioni UI")
@@ -4055,7 +4413,7 @@ elif menu == "🎨 Editor Grafica":
         st.rerun()
 
 # =====================================================================
-# 11. PANNELLO ADMIN
+# 12. PANNELLO ADMIN
 # =====================================================================
 elif menu == "🛡️ Pannello Admin":
     if not st.session_state.get("is_admin", False):
