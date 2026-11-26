@@ -2627,9 +2627,9 @@ elif menu == "⚡ Inserimento Parametri & Voti":
                 else:
                     ruolo_c = p_dati_g.get("ruolo_campo") or ruolo_default_da_rosa(db_giocatori.get(nome, {}).get("ruolo", ""))
                     dm = estrai_dati_movimento_compat(p_dati_g)
-                    righe_csv.append({
+                    righe_csv.append({}
                         "Numero": n,
                         "Giocatore": nome,
                         "Ruolo": ruolo_c,
                         "Area": get_etichetta_area(ruolo_c),
-                        "Minuti": p_dati}
+                        "Minuti": p_dati
