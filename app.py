@@ -195,6 +195,7 @@ TUTTE_LE_SCHEDE_APP = [
 
 UTENTI_EXTRA_HOME = ["Mr Fabio", "Mirko", "Mr. Alessandro"]
 
+
 def ottieni_opzioni_accesso_home(db_giocatori):
     """Restituisce la lista utenti per la Home includendo Mr Fabio, Mirko, Mr. Alessandro e tutta la rosa."""
     nomi_rosa = list((db_giocatori or {}).keys())
@@ -205,6 +206,7 @@ def ottieni_opzioni_accesso_home(db_giocatori):
             opzioni.append(u_clean)
     return opzioni if opzioni else UTENTI_EXTRA_HOME.copy()
 
+
 def ottieni_profilo_home_attivo():
     """Restituisce il profilo selezionato all'accesso nella Home se disponibile."""
     return (
@@ -212,6 +214,7 @@ def ottieni_profilo_home_attivo():
         or st.session_state.get("ultimo_utente_home")
         or st.query_params.get("utente", "")
     )
+
 
 def sincronizza_client_localstorage(utente_da_salvare=None):
     """Salva su localStorage del client l'utente scelto oppure lo legge e aggiorna ?utente= al primo caricamento."""
@@ -248,6 +251,7 @@ def sincronizza_client_localstorage(utente_da_salvare=None):
             width=0,
         )
 
+
 def normalizza_impatto_partita(valore):
     val = str(valore or "").strip()
     if val in DELTA_IMPATTO_PARTITA:
@@ -260,6 +264,7 @@ def normalizza_impatto_partita(valore):
         "Pessima": "In difficoltà",
     }
     return mappa_vecchia.get(val, "Ordinato")
+
 
 def normalizza_gestione_palla(valore):
     val = str(valore or "").strip()
@@ -274,11 +279,13 @@ def normalizza_gestione_palla(valore):
     }
     return mappa_vecchia.get(val, "Pulita")
 
+
 def normalizza_sicurezza_portiere(valore):
     val = str(valore or "").strip()
     if val in DELTA_SICUREZZA_PORTIERE:
         return val
     return "Affidabile"
+
 
 def calcola_media_giudizio(valori, opzioni, scala):
     """Restituisce l'etichetta media su scala ordinata."""
@@ -290,6 +297,7 @@ def calcola_media_giudizio(valori, opzioni, scala):
     media_val = sum(valori_validi) / len(valori_validi)
     return min(opzioni, key=lambda k: abs(scala[k] - media_val))
 
+
 def estrai_fairplay_compat(d_p):
     """Estrae i flag booleani ammonito ed espulso da una prestazione giocatore."""
     if not isinstance(d_p, dict):
@@ -297,6 +305,7 @@ def estrai_fairplay_compat(d_p):
     amm = bool(d_p.get("ammonito", d_p.get("ammonizione", False)))
     esp = bool(d_p.get("espulso", d_p.get("espulsione", False)))
     return {"ammonito": amm, "espulso": esp}
+
 
 def get_macro_ruolo(ruolo_specifico):
     if ruolo_specifico in RUOLI_DIFENSORI:
@@ -307,8 +316,10 @@ def get_macro_ruolo(ruolo_specifico):
         return "ATTACCANTE"
     return "CENTROCAMPISTA"
 
+
 def get_etichetta_area(ruolo_specifico):
     return PESI_AREA_GIOCO[get_macro_ruolo(ruolo_specifico)]["etichetta"]
+
 
 def ruolo_default_da_rosa(ruolo_rosa_str):
     r = (ruolo_rosa_str or "").upper()
@@ -325,6 +336,7 @@ def ruolo_default_da_rosa(ruolo_rosa_str):
     if "TQ" in r:
         return "TQ"
     return "CC"
+
 
 def estrai_dati_movimento_compat(d_p):
     """Legge i parametri snelli mantenendo retrocompatibilità con eventuali dati storici."""
@@ -348,6 +360,7 @@ def estrai_dati_movimento_compat(d_p):
         "espulso": fp["espulso"],
     }
 
+
 def estrai_dati_portiere_compat(d_p):
     """Legge i parametri snelli del portiere mantenendo retrocompatibilità con dati storici."""
     sicurezza = normalizza_sicurezza_portiere(d_p.get("sicurezza_portiere", "Affidabile"))
@@ -366,6 +379,7 @@ def estrai_dati_portiere_compat(d_p):
         "ammonito": fp["ammonito"],
         "espulso": fp["espulso"],
     }
+
 
 def valori_base_giocatore(nome_g, is_portiere, is_riserva, db_giocatori):
     """Restituisce i valori iniziali/azzerati per un giocatore nel modello snello e visivo."""
@@ -394,6 +408,7 @@ def valori_base_giocatore(nome_g, is_portiere, is_riserva, db_giocatori):
         "ammonito": False,
         "espulso": False,
     }
+
 
 def ripristina_parametri_partita(partita_sel, p_dati, db_giocatori):
     """Riporta ai valori base i parametri della partita senza modificare il ruolo già impostato."""
@@ -462,6 +477,7 @@ def ripristina_parametri_partita(partita_sel, p_dati, db_giocatori):
     st.session_state["partita_attiva"] = partita_sel
     salva_dati_su_disco()
 
+
 def parse_frazione(val_str):
     """Restituisce (numeratore, denominatore) da stringhe tipo '5/5' o '0/1'."""
     try:
@@ -471,6 +487,7 @@ def parse_frazione(val_str):
     except Exception:
         pass
     return 0, 0
+
 
 def hex_to_rgba(hex_color, alpha):
     """Converte un colore HEX (#rrggbb) in stringa rgba(r, g, b, alpha)."""
@@ -483,6 +500,7 @@ def hex_to_rgba(hex_color, alpha):
     alpha_clamped = max(0.0, min(1.0, float(alpha)))
     return f"rgba({r}, {g}, {b}, {alpha_clamped:.2f})"
 
+
 # =====================================================================
 # GESTIONE LOGO, IMMAGINE HOME, FOTO GIOCATORI, SICUREZZA & SYNC GITHUB
 # =====================================================================
@@ -491,8 +509,10 @@ HOME_IMAGE_PATH = "eagle.jpg" if os.path.exists("eagle.jpg") else ("eagle.png" i
 DB_FILE = "scoutai_database.json"
 PLAYER_PHOTOS_DIR = "player_photos"
 
+
 def _hash_pin(pin_str):
     return hashlib.sha256((pin_str or "").encode("utf-8")).hexdigest()
+
 
 def salva_foto_giocatore(nome_giocatore, uploaded_file):
     """Salva l'immagine caricata in player_photos/ e restituisce il percorso relativo."""
@@ -509,12 +529,14 @@ def salva_foto_giocatore(nome_giocatore, uploaded_file):
         f.write(uploaded_file.getbuffer())
     return file_path
 
+
 def ottieni_foto_valida(nome_giocatore, db_giocatori):
     """Restituisce il percorso della foto se esiste davvero su disco, altrimenti None."""
     foto_path = db_giocatori.get(nome_giocatore, {}).get("foto_path")
     if foto_path and os.path.exists(foto_path):
         return foto_path
     return None
+
 
 def costruisci_payload_database():
     """Restituisce il dizionario completo dello stato/database salvabile su disco o in backup JSON."""
@@ -530,6 +552,7 @@ def costruisci_payload_database():
         "categorie_video": st.session_state.get("categorie_video", ["Allenamenti", "Clip Tattiche", "Motivazione"]),
         "altri_video": st.session_state.get("altri_video", []),
     }
+
 
 def applica_payload_database(payload):
     """Applica un dizionario di backup/database validato allo session_state e lo salva su disco."""
@@ -551,7 +574,7 @@ def applica_payload_database(payload):
         st.session_state["ui_theme"] = merged_theme
 
     if "fullscreen_mode" in payload:
-        st.session_state["fullscreen_mode"] = bool(payload["fullscreen_mode", False])
+        st.session_state["fullscreen_mode"] = bool(payload.get("fullscreen_mode", False))
 
     if isinstance(payload.get("auth_config"), dict) and payload["auth_config"]:
         cfg_imp = payload["auth_config"].copy()
@@ -585,6 +608,7 @@ def applica_payload_database(payload):
     salva_dati_su_disco()
     return True, f"Backup importato: {len(giocatori_imp)} giocatori e {len(partite_imp)} partite ripristinati."
 
+
 def _get_github_sync_cfg():
     """Legge la configurazione [github_sync] da st.secrets se presente e completa."""
     try:
@@ -608,12 +632,14 @@ def _get_github_sync_cfg():
         "branch": branch,
     }
 
+
 def _github_headers(token):
     return {
         "Authorization": f"Bearer {token}",
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
     }
+
 
 def _leggi_json_github(cfg):
     """Restituisce (payload_dict, sha_str) oppure (None, None) se il file non esiste ancora."""
@@ -635,6 +661,7 @@ def _leggi_json_github(cfg):
         return None, sha
     decoded_text = base64.b64decode(raw_b64).decode("utf-8")
     return json.loads(decoded_text), sha
+
 
 def _scrivi_json_github(cfg, payload_dict, commit_message="Aggiorna stato ScoutAI"):
     """Crea o aggiorna il file JSON su GitHub; in caso di 409/422 rilegge lo SHA più recente e ritenta."""
@@ -662,6 +689,7 @@ def _scrivi_json_github(cfg, payload_dict, commit_message="Aggiorna stato ScoutA
 
     resp.raise_for_status()
 
+
 def salva_dati_su_disco():
     """Salva lo stato in locale (se possibile) e lo sincronizza su GitHub se configurato in st.secrets."""
     data_to_save = costruisci_payload_database()
@@ -682,6 +710,7 @@ def salva_dati_su_disco():
         except Exception as e:
             print(f"Errore sincronizzazione GitHub: {e}")
 
+
 def carica_dati_da_disco():
     """Carica il JSON di stato da GitHub se configurato in st.secrets, con fallback al file locale."""
     gh_cfg = _get_github_sync_cfg()
@@ -700,6 +729,7 @@ def carica_dati_da_disco():
         except Exception:
             pass
     return None
+
 
 def inizializza_sicurezza_ruoli(dati_salvati):
     if "auth_config" not in st.session_state:
@@ -730,11 +760,13 @@ def inizializza_sicurezza_ruoli(dati_salvati):
     if "is_admin" not in st.session_state:
         st.session_state["is_admin"] = False
 
+
 def is_sola_lettura():
     """Restituisce True se l'utente corrente è in modalità lettura limitata (ragazzi)."""
     return (not st.session_state.get("is_admin", False)) and bool(
         st.session_state.get("auth_config", {}).get("read_only_boys", True)
     )
+
 
 def render_controllo_schede_ui(key_prefix="admin"):
     """Controllo condiviso per attivare/nascondere le schede da Pannello Admin o Editor Grafica."""
@@ -770,6 +802,7 @@ def render_controllo_schede_ui(key_prefix="admin"):
 
     return nuove_attive if nuove_attive else ["📈 Riepilogo Squadra"], bool(applica_admin)
 
+
 def estrai_youtube_id(url):
     if not url:
         return None
@@ -785,6 +818,7 @@ def estrai_youtube_id(url):
         return url
     return None
 
+
 def parse_data_partita(data_str):
     """Converte una stringa data in oggetto datetime per ordinamento sicuro."""
     for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y"):
@@ -793,6 +827,7 @@ def parse_data_partita(data_str):
         except ValueError:
             continue
     return datetime.min
+
 
 # =====================================================================
 # INIZIALIZZAZIONE STATO TEMA & DATABASE
@@ -1094,6 +1129,7 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
+
 def mostra_notifica_tema(messaggio, icona="✅"):
     st.markdown(f"""
     <div class="scoutai-theme-toast">
@@ -1101,6 +1137,7 @@ def mostra_notifica_tema(messaggio, icona="✅"):
         <div style="font-weight: 600; color: {tema['text_color']};">{messaggio}</div>
     </div>
     """, unsafe_allow_html=True)
+
 
 # =====================================================================
 # SCHERMATA HOME DI ACCESSO
@@ -1226,6 +1263,7 @@ with col_title_h:
 
 st.divider()
 
+
 # =====================================================================
 # MOTORE DI CALCOLO VOTO SNELLO & VISIVO (PESATO PER AREA DI GIOCO + ESPULSIONE -1)
 # =====================================================================
@@ -1275,6 +1313,7 @@ def calcola_voto(p, is_portiere=False):
     except Exception:
         return 6.0
 
+
 def calcola_trend_giocatore(storico_voti):
     if len(storico_voti) < 2:
         return "Stabile (↔️)"
@@ -1284,6 +1323,7 @@ def calcola_trend_giocatore(storico_voti):
     elif diff < 0:
         return f"In Decrescita 📉 ({diff})"
     return "Stabile (↔️)"
+
 
 def calcola_statistiche_stagionali_giocatore(nome_giocatore, db_partite, db_giocatori):
     """Calcola il profilo completo stagionale e partita per partita di un singolo giocatore."""
@@ -1397,6 +1437,7 @@ def calcola_statistiche_stagionali_giocatore(nome_giocatore, db_partite, db_gioc
         "serie_match": serie_match,
     }
 
+
 def calcola_mvp_partita(p_val, db_partite, db_giocatori):
     """
     Determina il/i giocatore/i MVP di una partita in base a:
@@ -1482,17 +1523,28 @@ def calcola_mvp_partita(p_val, db_partite, db_giocatori):
 
 def calcola_mvp_stagione(db_partite, db_giocatori):
     """
-    Calcola l'MVP (o i pari merito totali) della stagione considerando:
+    Calcola l'MVP (o i pari merito totali) della stagione SOLO tra i giocatori che
+    risultano almeno una volta MVP (o pari merito) in almeno una partita, considerando:
     1) Media voto stagionale più alta
     2) Punteggio/contributo netto stagionale più alto ((gol + assist) - errori_gravi)
     3) Più gol stagionali, poi più assist stagionali, poi meno errori gravi stagionali
     4) Minor minutaggio stagionale totale
     5) In caso di parità totale: restituisce tutti i giocatori a pari merito.
     """
+    mvp_partite_nomi = set()
+    for _, p_val in db_partite.items():
+        for m_item in calcola_mvp_partita(p_val, db_partite, db_giocatori):
+            nome_mvp = (m_item.get("nome") or "").strip()
+            if nome_mvp:
+                mvp_partite_nomi.add(nome_mvp)
+
+    if not mvp_partite_nomi:
+        return []
+
     agg = {}
     for _, p_val in db_partite.items():
         for n, nome in p_val.get("formazione", {}).items():
-            if not nome:
+            if not nome or nome not in mvp_partite_nomi:
                 continue
             d_p = p_val.get("dati_prestazione", {}).get(nome, {})
             if not d_p:
@@ -1584,6 +1636,7 @@ def _crea_immagine_pdf_adattata(img_path, max_w=34, max_h=34):
         return RLImage(img_path, width=max_w, height=max_h)
     except Exception:
         return None
+
 
 def genera_pdf_partita(match_name, match_data, db_giocatori, accent_hex):
     if not REPORTLAB_AVAILABLE:
@@ -1694,6 +1747,7 @@ def genera_pdf_partita(match_name, match_data, db_giocatori, accent_hex):
     doc.build(elements)
     return filename
 
+
 # =====================================================================
 # RENDER SVG LAVAGNA TATTICA
 # =====================================================================
@@ -1770,32 +1824,27 @@ def genera_svg_lavagna_tattica(modulo, nodi_campo, accent_hex, bg_card_hex):
                 </linearGradient>
             </defs>
             <rect x="0" y="0" width="600" height="860" rx="10" fill="url(#pitchGrad)"/>
-            <!-- Fasce erba -->
             <rect x="28" y="32" width="544" height="88" fill="rgba(255,255,255,0.03)"/>
             <rect x="28" y="208" width="544" height="88" fill="rgba(255,255,255,0.03)"/>
             <rect x="28" y="384" width="544" height="88" fill="rgba(255,255,255,0.03)"/>
             <rect x="28" y="560" width="544" height="88" fill="rgba(255,255,255,0.03)"/>
             <rect x="28" y="736" width="544" height="92" fill="rgba(255,255,255,0.03)"/>
 
-            <!-- Linee perimetrali e centrocampo -->
             <rect x="28" y="32" width="544" height="796" fill="none" stroke="rgba(255,255,255,0.78)" stroke-width="2.5"/>
             <line x1="28" y1="430" x2="572" y2="430" stroke="rgba(255,255,255,0.78)" stroke-width="2.2"/>
             <circle cx="300" cy="430" r="68" fill="none" stroke="rgba(255,255,255,0.78)" stroke-width="2.2"/>
             <circle cx="300" cy="430" r="4" fill="rgba(255,255,255,0.9)"/>
 
-            <!-- Area di rigore alta (avversaria) -->
             <rect x="148" y="32" width="304" height="122" fill="none" stroke="rgba(255,255,255,0.78)" stroke-width="2.2"/>
             <rect x="224" y="32" width="152" height="46" fill="none" stroke="rgba(255,255,255,0.78)" stroke-width="2.2"/>
             <circle cx="300" cy="114" r="3.5" fill="rgba(255,255,255,0.9)"/>
             <path d="M 244 154 A 64 64 0 0 0 356 154" fill="none" stroke="rgba(255,255,255,0.78)" stroke-width="2.2"/>
 
-            <!-- Area di rigore bassa (propria) -->
             <rect x="148" y="706" width="304" height="122" fill="none" stroke="rgba(255,255,255,0.78)" stroke-width="2.2"/>
             <rect x="224" y="782" width="152" height="46" fill="none" stroke="rgba(255,255,255,0.78)" stroke-width="2.2"/>
             <circle cx="300" cy="746" r="3.5" fill="rgba(255,255,255,0.9)"/>
             <path d="M 244 706 A 64 64 0 0 1 356 706" fill="none" stroke="rgba(255,255,255,0.78)" stroke-width="2.2"/>
 
-            <!-- Etichetta modulo in alto -->
             <rect x="40" y="42" width="108" height="24" rx="6" fill="rgba(9,10,15,0.75)"/>
             <text x="94" y="58" text-anchor="middle" fill="#ffffff" font-family="sans-serif" font-size="12" font-weight="800">MODULO {modulo_use}</text>
 
@@ -1803,6 +1852,8 @@ def genera_svg_lavagna_tattica(modulo, nodi_campo, accent_hex, bg_card_hex):
         </svg>
     </div>
     """
+
+
 # =====================================================================
 # SIDEBAR, LOGIN ADMIN, PERSISTENZA SELEZIONE PARTITA & NAVIGAZIONE
 # =====================================================================
@@ -1827,6 +1878,7 @@ if partite_ordinate_chiavi:
 else:
     st.session_state["partita_attiva"] = None
 
+
 def get_partita_attiva_corrente():
     if not partite_ordinate_chiavi:
         return None
@@ -1835,6 +1887,7 @@ def get_partita_attiva_corrente():
         return curr
     st.session_state["partita_attiva"] = partite_ordinate_chiavi[0]
     return partite_ordinate_chiavi[0]
+
 
 def selettore_partita_persistente(label, widget_key):
     """Renderizza un selectbox sincronizzato con partita_attiva e salvato su disco al cambio."""
@@ -1857,6 +1910,7 @@ def selettore_partita_persistente(label, widget_key):
         key=widget_key,
         on_change=_on_change_partita
     )
+
 
 with st.sidebar:
     utente_corrente_sb = st.session_state.get("utente_attivo") or st.session_state.get("ultimo_utente_home")
@@ -2124,7 +2178,6 @@ elif menu == "🧲 Lavagna Tattica":
                 key=f"lavagna_stile_{partita_sel}"
             )
 
-        # Costruzione nodi titolari (maglie 1..11) mappati sulle coordinate del modulo
         layout_mod = COORDINATE_MODULI[modulo_scelto]
         nodi_campo = []
         maglie_usate = set()
@@ -3233,7 +3286,6 @@ elif menu == "⚖️ Confronto Giocatori":
     stat_a = calcola_statistiche_stagionali_giocatore(gioc_a, db_partite, db_giocatori)
     stat_b = calcola_statistiche_stagionali_giocatore(gioc_b, db_partite, db_giocatori)
 
-    # Schede profilo affiancate
     col_card_a, col_card_b = st.columns(2)
     for col_target, st_g, colore_bordo, badge_lbl in [
         (col_card_a, stat_a, accent_hex, "GIOCATORE A"),
@@ -3262,7 +3314,6 @@ elif menu == "⚖️ Confronto Giocatori":
 
     st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
-    # KPI principali a confronto
     k1, k2, k3, k4 = st.columns(4)
     k1.metric(
         f"Media Voto ({gioc_a})",
@@ -3878,8 +3929,9 @@ elif menu == "📊 Grafici & Analisi Visiva":
 elif menu == "🏅 MVP":
     st.title("🏅 MVP di Partita & Stagione")
     st.caption(
-        "Genera l'**MVP della stagione** dal pulsante in alto o consulta i box compatti per ogni partita "
-        "in base a **voto** e **punteggio contributi**, con spareggio su gol, assist, meno errori gravi e minor minutaggio (partita poi stagione), "
+        "Genera l'**MVP della stagione** (scelto tra chi è stato almeno una volta MVP di partita) dal pulsante in alto "
+        "oppure consulta i box compatti per ogni partita in base a **voto** e **punteggio contributi**, "
+        "con spareggio su gol, assist, meno errori gravi e minor minutaggio (partita poi stagione), "
         "oppure tutti i giocatori a pari merito in caso di parità totale."
     )
 
@@ -3987,7 +4039,6 @@ elif menu == "🏅 MVP":
         key=lambda item: parse_data_partita(item[1].get("data", "01/01/2026"))
     )
 
-    # Griglia compatta a 3 colonne: un box snello per ogni partita
     for idx_m in range(0, len(partite_ordinate_mvp), 3):
         cols_mvp = st.columns(3)
         for j in range(3):
@@ -4523,73 +4574,44 @@ elif menu == "🛡️ Pannello Admin":
         righe_accessi.append({
             "Utente / Giocatore": u_nome,
             "Accessi": int(info_u.get("count", 0)),
-            "Ultimo Accesso": info_u.get("ultimo_accesso") or "Mai",
+            "Ultimo Accesso": info_u.get("ultimo_accesso", "Mai"),
         })
-    df_accessi = pd.DataFrame(righe_accessi).sort_values(
-        by=["Accessi", "Utente / Giocatore"], ascending=[False, True]
-    )
-    st.table(df_accessi)
-
-    col_rst_singolo, col_rst_tutti = st.columns([2, 1.3])
-    with col_rst_singolo:
-        utente_reset = st.selectbox(
-            "Seleziona utente da azzerare",
-            options=opzioni_reg,
-            key="sel_utente_reset_accessi",
-            label_visibility="collapsed"
-        )
-        if st.button("🔄 Reset Contatore Accessi", use_container_width=True, key="btn_reset_singolo_accesso"):
-            st.session_state.setdefault("statistiche_accessi", {})[utente_reset] = {
-                "count": 0,
-                "ultimo_accesso": "Mai",
-            }
-            salva_dati_su_disco()
-            st.success(f"Contatore accessi resettato per {utente_reset}!")
-            st.rerun()
-
-    with col_rst_tutti:
-        st.markdown("<div style='height: 38px;'></div>", unsafe_allow_html=True)
-        if st.button("🗑️ Reset Tutti gli Accessi", use_container_width=True, key="btn_reset_accessi"):
-            st.session_state["statistiche_accessi"] = {}
-            salva_dati_su_disco()
-            st.success("Tutti i contatori accessi sono stati resettati!")
-            st.rerun()
+    righe_accessi.sort(key=lambda x: (-x["Accessi"], x["Utente / Giocatore"]))
+    st.table(pd.DataFrame(righe_accessi))
 
     st.divider()
-    st.subheader("🎬 Categorie per 'Altri Video'")
-    st.caption("Definisci le categorie con cui raggruppare i video extra non legati a partite.")
-
+    st.subheader("🎬 Gestione Categorie 'Altri Video'")
     cats_attuali = st.session_state.get("categorie_video") or ["Allenamenti", "Clip Tattiche", "Motivazione"]
-    st.write("**Categorie attuali:** " + (", ".join(f"`{c}`" for c in cats_attuali)))
+    st.markdown("**Categorie attive:** " + ", ".join(f"`{c}`" for c in cats_attuali))
 
-    c_add_cat, c_del_cat = st.columns(2)
-    with c_add_cat:
-        nuova_cat_nome = st.text_input("Nuova categoria video", placeholder="Es. Palle inattive", key="input_nuova_cat_video")
-        if st.button("➕ Aggiungi Categoria", use_container_width=True, key="btn_add_cat_video"):
-            nome_pulito = (nuova_cat_nome or "").strip()
-            if not nome_pulito:
-                st.warning("Inserisci il nome della categoria.")
-            elif nome_pulito in cats_attuali:
+    col_add_cat, col_del_cat = st.columns(2)
+    with col_add_cat:
+        nuova_cat_nome = st.text_input("Nome nuova categoria", placeholder="Es. Palle inattive", key="admin_nuova_cat_input")
+        if st.button("➕ Aggiungi Categoria", use_container_width=True, key="admin_btn_add_cat"):
+            pulita = (nuova_cat_nome or "").strip()
+            if not pulita:
+                st.warning("Inserisci un nome per la categoria.")
+            elif pulita in cats_attuali:
                 st.info("Questa categoria esiste già.")
             else:
-                cats_attuali.append(nome_pulito)
+                cats_attuali.append(pulita)
                 st.session_state["categorie_video"] = cats_attuali
                 salva_dati_su_disco()
-                st.success(f"Categoria '{nome_pulito}' aggiunta!")
+                st.session_state["admin_notice"] = f"Categoria '{pulita}' aggiunta."
                 st.rerun()
 
-    with c_del_cat:
-        cat_da_rim = st.selectbox("Categoria da rimuovere", options=cats_attuali, key="sel_del_cat_video")
-        if st.button("🗑️ Rimuovi Categoria", use_container_width=True, key="btn_del_cat_video"):
+    with col_del_cat:
+        cat_da_rimuovere = st.selectbox("Categoria da rimuovere", options=cats_attuali, key="admin_sel_del_cat")
+        if st.button("🗑️ Rimuovi Categoria", use_container_width=True, key="admin_btn_del_cat"):
             if len(cats_attuali) <= 1:
-                st.warning("Deve restare almeno una categoria.")
+                st.warning("Deve restare almeno una categoria video.")
             else:
-                cats_rimaste = [c for c in cats_attuali if c != cat_da_rim]
-                cat_fallback = cats_rimaste[0]
-                for v_item in st.session_state.get("altri_video", []):
-                    if v_item.get("categoria") == cat_da_rim:
-                        v_item["categoria"] = cat_fallback
-                st.session_state["categorie_video"] = cats_rimaste
+                cats_aggiornate = [c for c in cats_attuali if c != cat_da_rimuovere]
+                fallback_cat = cats_aggiornate[0]
+                for vid_item in st.session_state.get("altri_video", []):
+                    if vid_item.get("categoria") == cat_da_rimuovere:
+                        vid_item["categoria"] = fallback_cat
+                st.session_state["categorie_video"] = cats_aggiornate
                 salva_dati_su_disco()
-                st.success(f"Categoria '{cat_da_rim}' rimossa (video spostati su '{cat_fallback}').")
+                st.session_state["admin_notice"] = f"Categoria '{cat_da_rimuovere}' rimossa (eventuali video spostati in '{fallback_cat}')."
                 st.rerun()
