@@ -4020,23 +4020,18 @@ elif menu == "🏅 MVP":
                 badge_lbl = "PARI MERITO" if ex_aequo else "MVP"
                 righe_mvp_html = []
                 for m_item in lista_mvp:
-                    righe_mvp_html.append(f"""
-                    <div style="
-                        margin-top:5px;
-                        padding:6px 8px;
-                        border-radius:{max(6, radius_px-6)}px;
-                        background:rgba(255,255,255,0.03);
-                        border:1px solid {glow_border_rgba};
-                    ">
-                        <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
-                            <span style="font-size:13px; font-weight:800; color:{tema['text_color']};">🏅 {m_item['nome']}</span>
-                            <span style="font-size:12px; font-weight:800; color:{accent_hex};">{m_item['voto']:.1f}</span>
-                        </div>
-                        <div style="font-size:11px; color:#cbd5e1; margin-top:2px;">
-                            Gol {m_item['gol']} · Ass {m_item['assist']} · Err {m_item['errori']} · Min {m_item['min_partita']}' (Stag {m_item['min_stagione']}')
-                        </div>
-                    </div>
-                    """)
+                    righe_mvp_html.append(
+                        f'<div style="margin-top:6px;padding:7px 9px;border-radius:{max(6, radius_px-6)}px;'
+                        f'background:rgba(255,255,255,0.04);border:1px solid {glow_border_rgba};">'
+                        f'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">'
+                        f'<span style="font-size:13px;font-weight:800;color:{tema["text_color"]} !important;line-height:1.25;">🏅 {m_item["nome"]}</span>'
+                        f'<span style="font-size:12px;font-weight:800;color:{accent_hex} !important;white-space:nowrap;line-height:1.25;">{m_item["voto"]:.1f}</span>'
+                        f'</div>'
+                        f'<div style="font-size:11px;color:#cbd5e1 !important;margin-top:3px;line-height:1.3;">'
+                        f'Gol {m_item["gol"]} · Ass {m_item["assist"]} · Err {m_item["errori"]} · Min {m_item["min_partita"]}\' (Stag {m_item["min_stagione"]}\')'
+                        f'</div>'
+                        f'</div>'
+                    )
 
                 st.markdown(f"""
                 <div style="
