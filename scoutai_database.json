@@ -23,7 +23,7 @@
     "Lorenzo Carè": {
       "ruolo": "Difensore centrale (DC)",
       "partite": {},
-      "foto_path": null
+      "foto_path": "player_photos/Lorenzo_Car.jpg"
     },
     "Antonio Cavuoto": {
       "ruolo": "Centrocampista (CEN)",
@@ -1677,7 +1677,7 @@
       "stile_tattico": "4-3-3 Gegenpressing & Verticalità"
     }
   },
-  "partita_attiva": "Sirmione (13/11/2026)",
+  "partita_attiva": "Bedizzole (22/11/2026)",
   "ui_theme": {
     "bg_main": "#070d19",
     "bg_card": "#0f172a",
@@ -1703,8 +1703,7 @@
       "📊 Grafici & Analisi Visiva",
       "⚖️ Confronto Giocatori",
       "🟨 Fair Play",
-      "🎬 Altri Video",
-      "🏅 MVP"
+      "🎬 Altri Video"
     ],
     "schede_attive": [
       "📋 Setup Partite & Formazioni",
@@ -1714,7 +1713,6 @@
       "📈 Riepilogo Squadra",
       "⚖️ Confronto Giocatori",
       "📊 Grafici & Analisi Visiva",
-      "🏅 MVP",
       "🟨 Fair Play",
       "👤 Gestione Rosa",
       "🎨 Editor Grafica"
@@ -1723,8 +1721,8 @@
   },
   "statistiche_accessi": {
     "Mirko": {
-      "count": 18,
-      "ultimo_accesso": "26/11/2026 14:04"
+      "count": 19,
+      "ultimo_accesso": "26/11/2026 15:12"
     },
     "Mr. Alessandro": {
       "count": 3,
