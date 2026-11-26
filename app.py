@@ -1142,7 +1142,7 @@ if not st.session_state["home_entered"]:
         st.markdown(
             "<div class='scoutai-home-banner'>"
             "<div class='scoutai-home-kicker'>ScoutAI · Match Analysis</div>"
-            "<h1 class='scoutai-home-title'>Benvenuti nella fortezza dei dati dell'USO NUVOLENTO - 2011</h1>"
+            "<h1 class='scoutai-home-title'>Benvenuti nell'app ufficiale dell'USO Nuvolento - 2011</h1>"
             "</div>",
             unsafe_allow_html=True,
         )
@@ -2554,7 +2554,7 @@ elif menu == "🎥 Video Analisi":
                 box-shadow: {box_shadow_glow};
                 background-color: {tema['bg_card']};
             ">
-                <div style="position: relative; width: 100%; padding-bottom: 56.25%; height: 0;">
+                <div style="position: relative; width: 100%; aspect-ratio: 16 / 9; height: auto;">
                     <iframe
                         src="{embed_url}"
                         title="Video Analisi - {partita_sel}"
@@ -2644,17 +2644,30 @@ elif menu == "🎬 Altri Video":
             st.markdown(f"### ▶️ In riproduzione: {vid_attivo.get('titolo', 'Video')}")
             st.caption(f"Categoria: **{vid_attivo.get('categoria', 'Generale')}**" + (f" · {vid_attivo.get('nota')}" if vid_attivo.get("nota") else ""))
             if yt_act:
-                components.html(
+                st.markdown(
                     f"""
-                    <div style="position:relative;width:100%;padding-bottom:56.25%;height:0;border-radius:{radius_px}px;overflow:hidden;border:1px solid {accent_hex};">
-                        <iframe src="https://www.youtube.com/embed/{yt_act}?autoplay=1"
-                            style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                            allowfullscreen></iframe>
+                    <div style="
+                        width: 100%;
+                        max-width: 100%;
+                        margin: 0 auto 12px auto;
+                        border-radius: {radius_px}px;
+                        overflow: hidden;
+                        border: 1px solid {accent_hex};
+                        box-shadow: {box_shadow_glow};
+                        background-color: {tema['bg_card']};
+                    ">
+                        <div style="position: relative; width: 100%; aspect-ratio: 16 / 9; height: auto;">
+                            <iframe
+                                src="https://www.youtube.com/embed/{yt_act}?autoplay=1"
+                                title="{vid_attivo.get('titolo', 'Video')}"
+                                style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; display: block;"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                allowfullscreen>
+                            </iframe>
+                        </div>
                     </div>
                     """,
-                    height=440,
-                    scrolling=False,
+                    unsafe_allow_html=True,
                 )
             if st.button("✖️ Chiudi anteprima grande", key="btn_chiudi_player_extra"):
                 st.session_state["video_in_riproduzione_id"] = None
