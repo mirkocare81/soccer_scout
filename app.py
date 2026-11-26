@@ -815,8 +815,251 @@ PRESET_TEMI = {
         "accent": "#ef4444", "text_color": "#fef2f2", "border_color": "#381a21",
         "border_radius": 8, "font_size": 16, "shadow_intensity": 20,
         "glow_intensity": 25, "glow_width": 14, "custom_css": ""
-    }
+    },
 }
+
+
+# =====================================================================
+# CALCOLO TOP 3 PARTITA, MVP PARTITA & MVP STAGIONE (LOGICA TOP 3)
+# =====================================================================
+def _calcola_voto_giocatore_partita_top3(nome_giocatore, d_p, db_giocatori):
+    """Calcola un voto numerico (4.0 - 10.0) a partire dai parametri di gara per la TOP 3."""
+    if not isinstance(d_p, dict):
+        return None
+    if int(d_p.get("minuti", 0)) <= 0:
+        return None
+
+    ruolo_campo = d_p.get("ruolo_campo") or ruolo_default_da_rosa(
+        (db_giocatori or {}).get(nome_giocatore, {}).get("ruolo", "")
+    )
+    is_portiere = (ruolo_campo == "POR") or ("sicurezza_portiere" in d_p) or ("parate_decisive" in d_p)
+
+    voto = 6.0
+    if is_portiere:
+        p = estrai_dati_portiere_compat(d_p)
+        voto += DELTA_SICUREZZA_PORTIERE.get(p["sicurezza_portiere"], 0.0)
+        voto += min(p["parate_decisive"] * 0.25, 1.5)
+        voto -= p["gol_subiti"] * 0.35
+        voto -= p["errori_gravi"] * 0.60
+    else:
+        m = estrai_dati_movimento_compat(d_p)
+        area = get_macro_ruolo(ruolo_campo)
+        pesi = PESI_AREA_GIOCO.get(area, PESI_AREA_GIOCO["CENTROCAMPISTA"])
+
+        voto += DELTA_IMPATTO_PARTITA.get(m["impatto_partita"], 0.0) * (pesi["impatto"] / 1.3)
+        voto += DELTA_GESTIONE_PALLA.get(m["gestione_palla"], 0.0) * (pesi["gestione"] / 1.4)
+        voto += m["gol_fatti"] * 0.80
+        voto += m["assist"] * 0.50 * (pesi["assist"] / 1.1)
+        voto -= m["errori_gravi"] * 0.50 * (pesi["errori"] / 1.2)
+
+    fp = estrai_fairplay_compat(d_p)
+    if fp["espulso"]:
+        voto -= 1.00
+
+    return max(4.0, min(10.0, round(voto, 2)))
+
+
+def _estrai_contributi_giocatore_partita_top3(nome_giocatore, d_p, db_giocatori):
+    """Restituisce flag portiere, gol, assist, punti (gol+assist) e gol_subiti."""
+    if not isinstance(d_p, dict):
+        return {
+            "is_portiere": False,
+            "gol": 0,
+            "assist": 0,
+            "punti": 0,
+            "gol_subiti": 0,
+        }
+
+    ruolo_campo = d_p.get("ruolo_campo") or ruolo_default_da_rosa(
+        (db_giocatori or {}).get(nome_giocatore, {}).get("ruolo", "")
+    )
+    is_portiere = (ruolo_campo == "POR") or ("sicurezza_portiere" in d_p) or ("parate_decisive" in d_p)
+
+    if is_portiere:
+        p = estrai_dati_portiere_compat(d_p)
+        return {
+            "is_portiere": True,
+            "gol": 0,
+            "assist": 0,
+            "punti": 0,
+            "gol_subiti": int(p["gol_subiti"]),
+        }
+
+    m = estrai_dati_movimento_compat(d_p)
+    gol = int(m["gol_fatti"])
+    assist = int(m["assist"])
+    return {
+        "is_portiere": False,
+        "gol": gol,
+        "assist": assist,
+        "punti": gol + assist,
+        "gol_subiti": 0,
+    }
+
+
+def calcola_top3_partita_top3(partita_dati, db_giocatori=None):
+    """
+    Calcola e restituisce la TOP 3 di una singola partita, includendo eventuali
+    pari merito sull'ultimo posto utile (3° posto).
+    """
+    db_giocatori = db_giocatori if db_giocatori is not None else st.session_state.get("database_giocatori", {})
+    prestazioni = (partita_dati or {}).get("dati_prestazione", {})
+    formazione = (partita_dati or {}).get("formazione", {})
+
+    maglia_by_nome = {}
+    for k_str, nome_g in formazione.items():
+        if nome_g and nome_g not in maglia_by_nome:
+            maglia_by_nome[nome_g] = str(k_str)
+
+    candidati = []
+    for nome_g, d_p in prestazioni.items():
+        if not nome_g or not isinstance(d_p, dict):
+            continue
+        voto = _calcola_voto_giocatore_partita_top3(nome_g, d_p, db_giocatori)
+        if voto is None:
+            continue
+        contrib = _estrai_contributi_giocatore_partita_top3(nome_g, d_p, db_giocatori)
+        candidati.append({
+            "giocatore": nome_g,
+            "maglia": maglia_by_nome.get(nome_g, str(db_giocatori.get(nome_g, {}).get("numero", ""))),
+            "voto": voto,
+            "is_portiere": contrib["is_portiere"],
+            "gol": contrib["gol"],
+            "assist": contrib["assist"],
+            "punti": contrib["punti"],
+            "gol_subiti": contrib["gol_subiti"],
+        })
+
+    if not candidati:
+        return []
+
+    candidati.sort(key=lambda x: (-x["voto"], x["giocatore"]))
+
+    voti_unici = sorted({c["voto"] for c in candidati}, reverse=True)
+    soglia_voto = voti_unici[min(2, len(voti_unici) - 1)]
+
+    top3 = [c for c in candidati if c["voto"] >= soglia_voto]
+    for item in top3:
+        item["pari_merito_terzo"] = (item["voto"] == soglia_voto and len(voti_unici) >= 3)
+    return top3
+
+
+def calcola_mvp_partita_top3(partita_dati, db_giocatori=None):
+    """Restituisce l'MVP (o gli MVP in caso di parità sul voto massimo) della partita."""
+    top3 = calcola_top3_partita_top3(partita_dati, db_giocatori=db_giocatori)
+    if not top3:
+        return []
+    voto_max = top3[0]["voto"]
+    return [c for c in top3 if c["voto"] == voto_max]
+
+
+def calcola_mvp_stagione_top3(database_partite=None, db_giocatori=None, includi_archiviate=False):
+    """
+    Restringe i candidati ai soli giocatori presenti almeno una volta nella TOP 3
+    di almeno una gara e applica i criteri in sequenza fermandosi al primo che
+    individua un solo giocatore:
+      1. Media voto stagionale più alta
+      2. Gol + Assist (oppure -gol_subiti per i portieri) più alto
+      3. Media voto più alta per minor numero di punti fatti (gol + assist)
+    """
+    database_partite = database_partite if database_partite is not None else st.session_state.get("database_partite", {})
+    db_giocatori = db_giocatori if db_giocatori is not None else st.session_state.get("database_giocatori", {})
+
+    presenze_top3 = set()
+    aggregato = {}
+
+    for _, p_dati in database_partite.items():
+        if not isinstance(p_dati, dict):
+            continue
+        if not includi_archiviate and bool(p_dati.get("archiviata", False)):
+            continue
+
+        top3_gara = calcola_top3_partita_top3(p_dati, db_giocatori=db_giocatori)
+        for item in top3_gara:
+            presenze_top3.add(item["giocatore"])
+
+        prestazioni = p_dati.get("dati_prestazione", {})
+        for nome_g, d_p in prestazioni.items():
+            if not nome_g or not isinstance(d_p, dict):
+                continue
+            voto = _calcola_voto_giocatore_partita_top3(nome_g, d_p, db_giocatori)
+            if voto is None:
+                continue
+            contrib = _estrai_contributi_giocatore_partita_top3(nome_g, d_p, db_giocatori)
+
+            if nome_g not in aggregato:
+                aggregato[nome_g] = {
+                    "giocatore": nome_g,
+                    "is_portiere": contrib["is_portiere"],
+                    "somma_voti": 0.0,
+                    "partite_giocate": 0,
+                    "gol": 0,
+                    "assist": 0,
+                    "punti": 0,
+                    "gol_subiti": 0,
+                }
+
+            rec = aggregato[nome_g]
+            rec["is_portiere"] = rec["is_portiere"] or contrib["is_portiere"]
+            rec["somma_voti"] += voto
+            rec["partite_giocate"] += 1
+            rec["gol"] += contrib["gol"]
+            rec["assist"] += contrib["assist"]
+            rec["punti"] += contrib["punti"]
+            rec["gol_subiti"] += contrib["gol_subiti"]
+
+    candidati = []
+    for nome_g in presenze_top3:
+        if nome_g not in aggregato:
+            continue
+        rec = aggregato[nome_g].copy()
+        gare = max(1, rec["partite_giocate"])
+        rec["media_voto"] = round(rec["somma_voti"] / gare, 3)
+        rec["valore_criterio_2"] = (-rec["gol_subiti"]) if rec["is_portiere"] else rec["punti"]
+        candidati.append(rec)
+
+    if not candidati:
+        return {
+            "vincitori": [],
+            "criterio_decisivo": "Nessun candidato idoneo (nessuna partita con TOP 3 registrata)",
+            "classifica": [],
+        }
+
+    # 1. Media voto stagionale più alta
+    max_media = max(c["media_voto"] for c in candidati)
+    rimasti = [c for c in candidati if c["media_voto"] == max_media]
+    if len(rimasti) == 1:
+        criterio_decisivo = "1. Media voto stagionale più alta"
+    else:
+        # 2. Gol + Assist (oppure -gol_subiti per i portieri) più alto
+        max_c2 = max(c["valore_criterio_2"] for c in rimasti)
+        rimasti = [c for c in rimasti if c["valore_criterio_2"] == max_c2]
+        if len(rimasti) == 1:
+            criterio_decisivo = "2. Gol + Assist (oppure -gol_subiti per portieri) più alto"
+        else:
+            # 3. Media voto più alta per minor numero di punti fatti (gol + assist)
+            min_punti = min(c["punti"] for c in rimasti)
+            rimasti = [c for c in rimasti if c["punti"] == min_punti]
+            if len(rimasti) == 1:
+                criterio_decisivo = "3. Media voto più alta per minor numero di punti fatti (gol + assist)"
+            else:
+                criterio_decisivo = "Parità assoluta anche dopo i 3 criteri"
+
+    candidati.sort(
+        key=lambda c: (
+            -c["media_voto"],
+            -c["valore_criterio_2"],
+            c["punti"],
+            c["giocatore"],
+        )
+    )
+
+    return {
+        "vincitori": [r["giocatore"] for r in rimasti],
+        "criterio_decisivo": criterio_decisivo,
+        "classifica": candidati,
+    }
+
 
 dati_salvati = carica_dati_da_disco()
 inizializza_sicurezza_ruoli(dati_salvati)
@@ -2127,7 +2370,6 @@ elif menu == "🧲 Lavagna Tattica":
                 key=f"lavagna_stile_{partita_sel}"
             )
 
-        # Costruzione nodi titolari (maglie 1..11) mappati sulle coordinate del modulo
         layout_mod = COORDINATE_MODULI[modulo_scelto]
         nodi_campo = []
         maglie_usate = set()
@@ -3246,7 +3488,6 @@ elif menu == "⚖️ Confronto Giocatori":
     stat_a = calcola_statistiche_stagionali_giocatore(gioc_a, db_partite, db_giocatori)
     stat_b = calcola_statistiche_stagionali_giocatore(gioc_b, db_partite, db_giocatori)
 
-    # Schede profilo affiancate
     col_card_a, col_card_b = st.columns(2)
     for col_target, st_g, colore_bordo, badge_lbl in [
         (col_card_a, stat_a, accent_hex, "GIOCATORE A"),
@@ -3275,7 +3516,6 @@ elif menu == "⚖️ Confronto Giocatori":
 
     st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
-    # KPI principali a confronto
     k1, k2, k3, k4 = st.columns(4)
     k1.metric(
         f"Media Voto ({gioc_a})",
@@ -4000,7 +4240,6 @@ elif menu == "🏅 MVP":
         key=lambda item: parse_data_partita(item[1].get("data", "01/01/2026"))
     )
 
-    # Griglia compatta a 3 colonne: un box snello per ogni partita
     for idx_m in range(0, len(partite_ordinate_mvp), 3):
         cols_mvp = st.columns(3)
         for j in range(3):
@@ -4243,307 +4482,353 @@ elif menu == "👤 Gestione Rosa":
                 if n_nome not in db_giocatori:
                     db_giocatori[n_nome] = {"ruolo": n_ruolo, "partite": {}, "foto_path": None}
                     salva_dati_su_disco()
-                    st.success(f"Giocatore {n_nome} aggiunto e salvato con successo!")
+                    st.success(f"{n_nome} aggiunto alla rosa!")
                     st.rerun()
+
+        st.divider()
+        st.subheader("📷 Foto Profilo Giocatori")
+        if db_giocatori:
+            nomi_foto = list(db_giocatori.keys())
+            gioc_foto_sel = st.selectbox("Seleziona giocatore per gestire la foto", nomi_foto, key="sel_gioc_foto")
+            foto_attuale = ottieni_foto_valida(gioc_foto_sel, db_giocatori)
+
+            c_prev_f, c_up_f = st.columns([0.22, 0.78])
+            with c_prev_f:
+                if foto_attuale:
+                    st.image(foto_attuale, width=90)
+                else:
+                    st.markdown(
+                        "<div style='width:90px;height:90px;border-radius:12px;display:flex;align-items:center;"
+                        "justify-content:center;background:#1e2230;font-size:36px;'>🧑🏻</div>",
+                        unsafe_allow_html=True
+                    )
+            with c_up_f:
+                up_foto = st.file_uploader(
+                    f"Carica foto per {gioc_foto_sel} (PNG, JPG, JPEG, WEBP)",
+                    type=["png", "jpg", "jpeg", "webp"],
+                    key=f"up_foto_{gioc_foto_sel}"
+                )
+                b_salva_f, b_rimuovi_f = st.columns(2)
+                with b_salva_f:
+                    if st.button("💾 Salva Foto Giocatore", key=f"btn_salva_foto_{gioc_foto_sel}"):
+                        if up_foto is not None:
+                            path_salvato = salva_foto_giocatore(gioc_foto_sel, up_foto)
+                            db_giocatori[gioc_foto_sel]["foto_path"] = path_salvato
+                            salva_dati_su_disco()
+                            st.success(f"Foto salvata per {gioc_foto_sel}!")
+                            st.rerun()
+                        else:
+                            st.warning("Seleziona prima un file immagine.")
+                with b_rimuovi_f:
+                    if st.button("🗑️ Rimuovi Foto", key=f"btn_rimuovi_foto_{gioc_foto_sel}"):
+                        vecchio = db_giocatori[gioc_foto_sel].get("foto_path")
+                        if vecchio and os.path.exists(vecchio):
+                            try:
+                                os.remove(vecchio)
+                            except Exception:
+                                pass
+                        db_giocatori[gioc_foto_sel]["foto_path"] = None
+                        salva_dati_su_disco()
+                        st.info(f"Foto rimossa per {gioc_foto_sel}.")
+                        st.rerun()
 
         st.divider()
 
     st.subheader("Rosa Attuale")
-    if not db_giocatori:
-        st.info("La rosa è attualmente vuota.")
-    else:
-        for nome, dati in list(db_giocatori.items()):
-            foto_att = ottieni_foto_valida(nome, db_giocatori)
-            chiave_box_foto = f"mostra_box_foto_{nome}"
-            if chiave_box_foto not in st.session_state:
-                st.session_state[chiave_box_foto] = False
-
-            if lettura_only:
-                c_img, c1 = st.columns([0.55, 4.35])
+    for g, d in db_giocatori.items():
+        foto_g = ottieni_foto_valida(g, db_giocatori)
+        cols = st.columns([0.12, 3, 2, 1]) if not lettura_only else st.columns([0.12, 3, 2])
+        with cols[0]:
+            if foto_g:
+                st.image(foto_g, width=44)
             else:
-                c_img, c1, c_btn_foto, c_btn_del = st.columns([0.55, 2.55, 0.9, 0.9])
-
-            with c_img:
-                if foto_att:
-                    st.image(foto_att, width=46)
-                else:
-                    st.markdown(
-                        "<div style='width:46px;height:46px;border-radius:50%;display:flex;align-items:center;"
-                        "justify-content:center;background:#1e2230;font-size:20px;'>🧑🏻</div>",
-                        unsafe_allow_html=True
-                    )
-            with c1:
-                stato_foto = " · 🖼️ Foto caricata" if foto_att else ""
-                st.markdown(
-                    f"<div class='scoutai-box' style='padding: 10px 14px; margin-bottom: 8px;'>"
-                    f"📌 <strong>{nome}</strong> — <em>Ruolo:</em> {dati['ruolo']}{stato_foto}</div>",
-                    unsafe_allow_html=True
-                )
-
-            if not lettura_only:
-                with c_btn_foto:
-                    if st.button("📷 Foto", key=f"btn_foto_{nome}", use_container_width=True):
-                        st.session_state[chiave_box_foto] = not st.session_state[chiave_box_foto]
-                        st.rerun()
-                with c_btn_del:
-                    if st.button("🗑️ Elimina", key=f"del_g_{nome}", use_container_width=True):
-                        if foto_att and os.path.exists(foto_att):
-                            try:
-                                os.remove(foto_att)
-                            except OSError:
-                                pass
-                        del db_giocatori[nome]
-                        salva_dati_su_disco()
-                        st.success(f"Rimosso {nome} e salvato.")
-                        st.rerun()
-
-                if st.session_state.get(chiave_box_foto):
-                    with st.container():
-                        f_up, f_save, f_rem = st.columns([2.6, 1.0, 1.0])
-                        with f_up:
-                            file_foto = st.file_uploader(
-                                f"Carica foto di {nome}",
-                                type=["png", "jpg", "jpeg", "webp"],
-                                key=f"up_foto_{nome}",
-                                label_visibility="collapsed"
-                            )
-                        with f_save:
-                            if st.button("💾 Salva Foto", key=f"save_foto_{nome}", use_container_width=True):
-                                if file_foto is not None:
-                                    nuovo_path = salva_foto_giocatore(nome, file_foto)
-                                    db_giocatori[nome]["foto_path"] = nuovo_path
-                                    st.session_state[chiave_box_foto] = False
-                                    salva_dati_su_disco()
-                                    st.success(f"Foto salvata per {nome}!")
-                                    st.rerun()
-                                else:
-                                    st.warning("Seleziona prima un'immagine.")
-                        with f_rem:
-                            if st.button("❌ Rimuovi Foto", key=f"rem_foto_{nome}", use_container_width=True):
-                                if foto_att and os.path.exists(foto_att):
-                                    try:
-                                        os.remove(foto_att)
-                                    except OSError:
-                                        pass
-                                db_giocatori[nome]["foto_path"] = None
-                                st.session_state[chiave_box_foto] = False
-                                salva_dati_su_disco()
-                                st.info(f"Foto rimossa per {nome}.")
-                                st.rerun()
-
-# =====================================================================
-# 11. EDITOR GRAFICA & SETTINGS
-# =====================================================================
-elif menu == "🎨 Editor Grafica":
-    st.title("🎨 Editor Grafica & Impostazioni UI")
-
-    if st.session_state.get("ui_notice"):
-        mostra_notifica_tema(st.session_state["ui_notice"], icona="✨")
-        st.session_state["ui_notice"] = None
-
-    st.subheader("🎭 Preset Tema")
-    cols_preset = st.columns(len(PRESET_TEMI))
-    for idx, (n_preset, v_preset) in enumerate(PRESET_TEMI.items()):
-        with cols_preset[idx]:
-            if st.button(n_preset, use_container_width=True, key=f"preset_{idx}"):
-                st.session_state["ui_theme"] = v_preset.copy()
+                st.markdown("🧑🏻")
+        cols[1].write(f"**{g}**")
+        cols[2].write(d["ruolo"])
+        if not lettura_only:
+            if cols[3].button("🗑️", key=f"del_g_{g}"):
+                del db_giocatori[g]
                 salva_dati_su_disco()
-                st.session_state["ui_notice"] = f"Preset '{n_preset}' applicato e salvato con successo."
                 st.rerun()
 
-    st.divider()
-    st.subheader("🎛️ Personalizzazione Font, Glow dei Box & Schermo")
-
-    attiva_fs = st.toggle(
-        "Abilita Modalità Fullscreen (Tutto Schermo)",
-        value=st.session_state["fullscreen_mode"],
-        key="toggle_fs_editor"
-    )
-
-    col_f1, col_f2 = st.columns(2)
-    with col_f1:
-        nuovo_font_size = st.slider(
-            "Dimensione Font (px)",
-            min_value=13,
-            max_value=22,
-            value=int(tema.get("font_size", 16)),
-            step=1,
-            key="slider_font_size"
-        )
-    with col_f2:
-        nuova_ombra = st.slider(
-            "Ombreggiatura Esterna Box (%)",
-            min_value=0,
-            max_value=80,
-            value=int(tema.get("shadow_intensity", 25)),
-            step=5,
-            key="slider_shadow_intensity"
-        )
-
-    col_g1, col_g2 = st.columns(2)
-    with col_g1:
-        nuova_glow_intensita = st.slider(
-            "Intensità Glow Box (%)",
-            min_value=0,
-            max_value=85,
-            value=int(tema.get("glow_intensity", 25)),
-            step=5,
-            key="slider_glow_intensity"
-        )
-    with col_g2:
-        nuova_glow_larghezza = st.slider(
-            "Larghezza Glow Box (px)",
-            min_value=0,
-            max_value=40,
-            value=int(tema.get("glow_width", 14)),
-            step=2,
-            key="slider_glow_width"
-        )
-
-    st.divider()
-    nuove_schede_graf, nascondi_admin_graf = render_controllo_schede_ui(key_prefix="grafica")
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("💾 Salva Impostazioni Grafiche", use_container_width=True, key="btn_salva_grafica"):
-        st.session_state["ui_theme"]["font_size"] = int(nuovo_font_size)
-        st.session_state["ui_theme"]["shadow_intensity"] = int(nuova_ombra)
-        st.session_state["ui_theme"]["glow_intensity"] = int(nuova_glow_intensita)
-        st.session_state["ui_theme"]["glow_width"] = int(nuova_glow_larghezza)
-        st.session_state["fullscreen_mode"] = bool(attiva_fs)
-        st.session_state["auth_config"]["schede_attive"] = nuove_schede_graf
-        st.session_state["auth_config"]["applica_nascoste_ad_admin"] = nascondi_admin_graf
-        salva_dati_su_disco()
-        st.session_state["ui_notice"] = (
-            f"Modifiche salvate e applicate! Font: {nuovo_font_size}px · "
-            f"Glow: {nuova_glow_intensita}% / {nuova_glow_larghezza}px · "
-            f"Schede attive: {len(nuove_schede_graf)}."
-        )
-        st.rerun()
-
 # =====================================================================
-# 12. PANNELLO ADMIN
+# 11. EDITOR GRAFICA & PERSONALIZZAZIONE UI
 # =====================================================================
-elif menu == "🛡️ Pannello Admin":
-    if not st.session_state.get("is_admin", False):
-        st.warning("Accesso riservato all'Admin. Effettua il login dalla sidebar.")
-        st.stop()
+elif menu == "🎨 Editor Grafica":
+    st.title("🎨 Editor Grafica & Personalizzazione UI")
+    lettura_only = is_sola_lettura()
 
-    st.title("🛡️ Pannello Admin — Controllo Accessi, Schede & Backup")
-
-    if st.session_state.get("admin_notice"):
-        st.success(st.session_state["admin_notice"])
-        st.session_state["admin_notice"] = None
-
-    with st.form("form_admin_accessi"):
-        st.subheader("1. Regole Accesso Ragazzi")
-        sola_lettura_attiva = st.toggle(
-            "Limita accesso in sola lettura per i ragazzi (blocca modifiche, salvataggi, eliminazioni e upload)",
-            value=bool(auth_cfg.get("read_only_boys", True)),
-        )
-
-        opzioni_sez_ragazzi = [s for s in TUTTE_LE_SCHEDE_APP if s != "🎨 Editor Grafica"]
-        sezioni_scelte = st.multiselect(
-            "Sezioni visibili ai ragazzi",
-            options=opzioni_sez_ragazzi,
-            default=[s for s in auth_cfg.get("sezioni_ragazzi", []) if s in opzioni_sez_ragazzi],
-        )
-
-        st.divider()
-        st.subheader("2. Cambia PIN Admin")
-        nuovo_pin = st.text_input("Nuovo PIN (lascia vuoto per mantenere l'attuale)", type="password")
-        conferma_pin = st.text_input("Conferma Nuovo PIN", type="password")
-
-        if st.form_submit_button("💾 Salva Accessi & PIN", use_container_width=True):
-            if nuovo_pin or conferma_pin:
-                if nuovo_pin != conferma_pin:
-                    st.error("I due PIN non coincidono.")
-                    st.stop()
-                if len(nuovo_pin.strip()) < 4:
-                    st.error("Usa un PIN di almeno 4 caratteri.")
-                    st.stop()
-                auth_cfg["admin_pin_hash"] = _hash_pin(nuovo_pin.strip())
-
-            auth_cfg["read_only_boys"] = bool(sola_lettura_attiva)
-            auth_cfg["sezioni_ragazzi"] = sezioni_scelte if sezioni_scelte else ["🎥 Video Analisi", "📈 Riepilogo Squadra"]
-            st.session_state["auth_config"] = auth_cfg
+    st.subheader("🗂️ Visibilità Schede")
+    if lettura_only:
+        st.info("Schede attive attualmente: " + ", ".join(auth_cfg.get("schede_attive", TUTTE_LE_SCHEDE_APP)))
+    else:
+        nuove_schede_graf, appl_admin_graf = render_controllo_schede_ui(key_prefix="grafica")
+        if st.button("💾 Applica Visibilità Schede", key="btn_applica_schede_grafica"):
+            st.session_state["auth_config"]["schede_attive"] = nuove_schede_graf
+            st.session_state["auth_config"]["applica_nascoste_ad_admin"] = appl_admin_graf
             salva_dati_su_disco()
-            st.success("Impostazioni di accesso salvate!")
+            st.session_state["ui_notice"] = ("Visibilità schede aggiornata con successo!", "✅")
             st.rerun()
 
     st.divider()
-    nuove_schede_adm, nascondi_admin_adm = render_controllo_schede_ui(key_prefix="admin_tab")
-    if st.button("💾 Salva Visibilità Schede", use_container_width=True, key="btn_salva_schede_admin"):
-        auth_cfg["schede_attive"] = nuove_schede_adm
-        auth_cfg["applica_nascoste_ad_admin"] = nascondi_admin_adm
-        st.session_state["auth_config"] = auth_cfg
+
+    if lettura_only:
+        st.info("👀 In modalità sola lettura puoi visualizzare il tema attivo e attivare/disattivare la modalità schermo intero.")
+        if st.button("🖥️ Attiva/Disattiva Schermo Intero", use_container_width=True):
+            st.session_state["fullscreen_mode"] = not st.session_state["fullscreen_mode"]
+            salva_dati_su_disco()
+            st.rerun()
+    else:
+        st.subheader("1. Preset Rapidi")
+        cols_p = st.columns(len(PRESET_TEMI))
+        for idx, (nome_preset, dati_preset) in enumerate(PRESET_TEMI.items()):
+            with cols_p[idx]:
+                if st.button(f"🎨 {nome_preset}", use_container_width=True, key=f"preset_{idx}"):
+                    st.session_state["ui_theme"] = dati_preset.copy()
+                    salva_dati_su_disco()
+                    st.session_state["ui_notice"] = (f"Preset '{nome_preset}' applicato con successo!", "🎨")
+                    st.rerun()
+
+        st.divider()
+
+        st.subheader("2. Colori & Effetti (Sfondo, Card, Glow, Ombra e Testo)")
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            bg_main = st.color_picker("Sfondo Principale", value=tema["bg_main"])
+            bg_card = st.color_picker("Sfondo Card & Box", value=tema["bg_card"])
+        with c2:
+            bg_sidebar = st.color_picker("Sfondo Sidebar", value=tema["bg_sidebar"])
+            accent = st.color_picker("Colore Accento & Glow", value=tema["accent"])
+        with c3:
+            text_color = st.color_picker("Colore Testo", value=tema["text_color"])
+            border_color = st.color_picker("Colore Bordo Base", value=tema["border_color"])
+
+        st.divider()
+
+        st.subheader("3. Tipografia, Bordi, Glow & Ombreggiatura")
+        c4, c5, c6 = st.columns(3)
+        with c4:
+            font_size = st.slider("Dimensione Testo Base (px)", min_value=13, max_value=22, value=int(tema.get("font_size", 16)))
+            border_radius = st.slider("Arrotondamento Bordi (px)", min_value=0, max_value=24, value=int(tema.get("border_radius", 12)))
+        with c5:
+            glow_intensity = st.slider("Intensità Glow (%)", min_value=0, max_value=80, value=int(tema.get("glow_intensity", 25)))
+            glow_width = st.slider("Ampiezza Bagliore Glow (px)", min_value=0, max_value=36, value=int(tema.get("glow_width", 14)))
+        with c6:
+            shadow_intensity = st.slider("Profondità Ombra Esterna (%)", min_value=0, max_value=80, value=int(tema.get("shadow_intensity", 25)))
+            fullscreen_toggle = st.toggle("Modalità Schermo Intero", value=is_fullscreen)
+
+        st.divider()
+
+        st.subheader("4. CSS Personalizzato (Avanzato)")
+        custom_css = st.text_area(
+            "Regole CSS extra (opzionale)",
+            value=tema.get("custom_css", ""),
+            height=110,
+            placeholder="Es: .stMetric { border-left: 4px solid #10b981; }"
+        )
+
+        col_save, col_reset = st.columns(2)
+        with col_save:
+            if st.button("💾 Applica e Salva Grafica", use_container_width=True, type="primary"):
+                st.session_state["ui_theme"] = {
+                    "bg_main": bg_main,
+                    "bg_card": bg_card,
+                    "bg_sidebar": bg_sidebar,
+                    "accent": accent,
+                    "text_color": text_color,
+                    "border_color": border_color,
+                    "font_size": font_size,
+                    "border_radius": border_radius,
+                    "glow_intensity": glow_intensity,
+                    "glow_width": glow_width,
+                    "shadow_intensity": shadow_intensity,
+                    "custom_css": custom_css
+                }
+                st.session_state["fullscreen_mode"] = fullscreen_toggle
+                salva_dati_su_disco()
+                st.session_state["ui_notice"] = ("Tema grafico, glow, ombre e impostazioni salvati con successo!", "💾")
+                st.rerun()
+
+        with col_reset:
+            if st.button("↩️ Ripristina Valori Predefiniti", use_container_width=True):
+                st.session_state["ui_theme"] = PRESET_TEMI["Emerald Dark (Default)"].copy()
+                st.session_state["fullscreen_mode"] = False
+                salva_dati_su_disco()
+                st.session_state["ui_notice"] = ("Grafica ripristinata ai valori predefiniti!", "↩️")
+                st.rerun()
+
+        st.divider()
+        st.subheader("5. Anteprima Live")
+        anteprima_glow = f"0 10px 24px rgba(0,0,0,{shadow_intensity/100:.2f}), 0 0 {glow_width}px {hex_to_rgba(accent, glow_intensity/100)}"
+        st.markdown(f"""
+        <div style="
+            background-color: {bg_card};
+            border: 1px solid {hex_to_rgba(accent, min(0.85, max(0.25, (glow_intensity/100)*1.4)))};
+            border-radius: {border_radius}px;
+            padding: 20px;
+            box-shadow: {anteprima_glow};
+            font-size: {font_size}px;
+        ">
+            <h4 style="margin-top:0; color:{accent};">USO Nuvolento - Anteprima Card</h4>
+            <p style="margin-bottom:0; color:{text_color};">
+                Questo box mostra in tempo reale colori, arrotondamento, intensità/ampiezza del <strong>glow</strong> e profondità dell'<strong>ombra esterna</strong>.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    avviso = st.session_state.get("ui_notice")
+    if avviso:
+        msg_avviso, ico_avviso = avviso
+        st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+        mostra_notifica_tema(msg_avviso, ico_avviso)
+        st.session_state["ui_notice"] = None
+
+# =====================================================================
+# 12. PANNELLO ADMIN (SICUREZZA, CATEGORIE VIDEO & BACKUP JSON)
+# =====================================================================
+elif menu == "🛡️ Pannello Admin":
+    if not st.session_state.get("is_admin", False):
+        st.error("⛔ Accesso riservato all'Admin. Effettua il login dalla barra laterale.")
+        st.stop()
+
+    st.title("🛡️ Pannello Amministratore")
+
+    st.subheader("🗂️ Visibilità Schede dell'Applicazione")
+    nuove_schede_adm, appl_admin_adm = render_controllo_schede_ui(key_prefix="admin")
+    if st.button("💾 Salva Impostazioni Schede", key="btn_salva_schede_admin"):
+        st.session_state["auth_config"]["schede_attive"] = nuove_schede_adm
+        st.session_state["auth_config"]["applica_nascoste_ad_admin"] = appl_admin_adm
         salva_dati_su_disco()
-        st.success("Visibilità delle schede salvata!")
+        st.success("Impostazioni di visibilità schede salvate!")
         st.rerun()
 
     st.divider()
-    st.subheader("💾 Backup & Ripristino Completo (JSON)")
-    st.caption(
-        "Esporta un file `.json` con tutta la rosa, le partite, le valutazioni, i link video, il tema e gli accessi. "
-        "Puoi importarlo in qualsiasi momento per ripristinare i dati."
+
+    st.subheader("🔒 Permessi Ragazzi & PIN Admin")
+    curr_read_only = bool(st.session_state["auth_config"].get("read_only_boys", True))
+    nuovo_read_only = st.toggle(
+        "Imposta modalità Sola Lettura per i ragazzi (blocca modifiche a formazioni, voti, video e grafiche)",
+        value=curr_read_only
     )
 
-    col_exp_json, col_imp_json = st.columns(2)
-    with col_exp_json:
-        json_backup_str = json.dumps(costruisci_payload_database(), ensure_ascii=False, indent=4).encode("utf-8")
-        nome_file_backup = f"scoutai_backup_{datetime.now().strftime('%Y%m%d_%H%M')}.json"
-        st.download_button(
-            "📤 Esporta Backup Completo JSON",
-            data=json_backup_str,
-            file_name=nome_file_backup,
-            mime="application/json",
-            use_container_width=True,
-            key="btn_export_backup_json"
+    sezioni_possibili_ragazzi = [
+        s for s in st.session_state["auth_config"].get("schede_attive", TUTTE_LE_SCHEDE_APP)
+        if s in TUTTE_LE_SCHEDE_APP
+    ] or TUTTE_LE_SCHEDE_APP.copy()
+    sezioni_attuali_ragazzi = [
+        s for s in st.session_state["auth_config"].get("sezioni_ragazzi", sezioni_possibili_ragazzi)
+        if s in sezioni_possibili_ragazzi
+    ]
+    nuove_sezioni_ragazzi = st.multiselect(
+        "Sezioni visibili ai ragazzi",
+        options=sezioni_possibili_ragazzi,
+        default=sezioni_attuali_ragazzi
+    )
+
+    col_p1, col_p2 = st.columns(2)
+    with col_p1:
+        nuovo_pin = st.text_input("Nuovo PIN Admin (lascia vuoto per non cambiarlo)", type="password")
+    with col_p2:
+        conferma_pin = st.text_input("Conferma Nuovo PIN Admin", type="password")
+
+    if st.button("💾 Salva Impostazioni Sicurezza", type="primary"):
+        if nuovo_pin or conferma_pin:
+            if len(nuovo_pin) < 4:
+                st.error("Il PIN deve avere almeno 4 caratteri.")
+                st.stop()
+            if nuovo_pin != conferma_pin:
+                st.error("I due PIN inseriti non coincidono.")
+                st.stop()
+            st.session_state["auth_config"]["admin_pin_hash"] = _hash_pin(nuovo_pin)
+
+        st.session_state["auth_config"]["read_only_boys"] = nuovo_read_only
+        st.session_state["auth_config"]["sezioni_ragazzi"] = nuove_sezioni_ragazzi or sezioni_possibili_ragazzi
+        salva_dati_su_disco()
+        st.success("Impostazioni di sicurezza aggiornate e salvate!")
+        st.rerun()
+
+    st.divider()
+    st.subheader("🎬 Gestione Categorie Sezione 'Altri Video'")
+    cats_admin = st.session_state.get("categorie_video") or ["Allenamenti", "Clip Tattiche", "Motivazione"]
+    vids_admin = st.session_state.get("altri_video") or []
+
+    with st.form("form_nuova_categoria_video"):
+        nuova_cat_nome = st.text_input("Nome nuova categoria", placeholder="Es. Palle inattive")
+        if st.form_submit_button("➕ Aggiungi Categoria"):
+            pulita = (nuova_cat_nome or "").strip()
+            if not pulita:
+                st.error("Inserisci un nome categoria valido.")
+            elif pulita in cats_admin:
+                st.warning("Questa categoria esiste già.")
+            else:
+                cats_admin.append(pulita)
+                st.session_state["categorie_video"] = cats_admin
+                salva_dati_su_disco()
+                st.success(f"Categoria '{pulita}' aggiunta!")
+                st.rerun()
+
+    if len(cats_admin) > 1:
+        cat_da_rimuovere = st.selectbox("Rimuovi categoria esistente", options=cats_admin, key="sel_rem_cat_vid")
+        if st.button("🗑️ Rimuovi Categoria Selezionata", key="btn_rem_cat_vid"):
+            fallback_cat = next((c for c in cats_admin if c != cat_da_rimuovere), "Generale")
+            for v_item in vids_admin:
+                if v_item.get("categoria") == cat_da_rimuovere:
+                    v_item["categoria"] = fallback_cat
+            st.session_state["categorie_video"] = [c for c in cats_admin if c != cat_da_rimuovere]
+            st.session_state["altri_video"] = vids_admin
+            salva_dati_su_disco()
+            st.success(f"Categoria '{cat_da_rimuovere}' rimossa (eventuali video spostati in '{fallback_cat}').")
+            st.rerun()
+    else:
+        st.caption("Deve rimanere almeno una categoria attiva.")
+
+    st.divider()
+    st.subheader("💾 Backup & Ripristino Completo Database (JSON)")
+    st.caption(
+        "Esporta un file JSON con tutta la rosa, le partite, i voti, i temi grafici e i permessi, "
+        "oppure importa un backup precedente per ripristinare o condividere i dati."
+    )
+
+    gh_cfg_status = _get_github_sync_cfg()
+    if gh_cfg_status:
+        st.success(
+            f"☁️ **Sync automatico GitHub attivo:** `{gh_cfg_status['owner']}/{gh_cfg_status['repo']}` "
+            f"(file `{gh_cfg_status['path']}` su branch `{gh_cfg_status['branch']}`)"
+        )
+    else:
+        st.info(
+            "💡 **Nota persistenza su Streamlit Cloud:** senza `[github_sync]` in `st.secrets`, "
+            "il riavvio o sleep del container può azzerare i file locali. Usa **Esporta Backup JSON** "
+            "per salvare una copia di sicurezza o configura `[github_sync]` nei Secrets."
         )
 
-    with col_imp_json:
-        uploaded_backup_json = st.file_uploader(
-            "Seleziona file di backup JSON",
-            type=["json"],
-            key="uploader_backup_json",
-            label_visibility="collapsed"
+    payload_json_str = json.dumps(costruisci_payload_database(), ensure_ascii=False, indent=2)
+    nome_file_backup = f"scoutai_backup_{datetime.now().strftime('%Y%m%d_%H%M')}.json"
+
+    col_exp, col_imp = st.columns(2)
+    with col_exp:
+        st.download_button(
+            "⬇️ Esporta Backup JSON",
+            data=payload_json_str.encode("utf-8"),
+            file_name=nome_file_backup,
+            mime="application/json",
+            use_container_width=True
         )
-        if st.button("📥 Importa Backup JSON", use_container_width=True, key="btn_import_backup_json"):
-            if uploaded_backup_json is None:
-                st.warning("Seleziona prima un file `.json` di backup.")
-            else:
-                try:
-                    uploaded_backup_json.seek(0)
-                    raw_bytes = uploaded_backup_json.read()
-                    parsed_payload = json.loads(raw_bytes.decode("utf-8"))
-                    ok, msg = applica_payload_database(parsed_payload)
+    with col_imp:
+        file_backup_up = st.file_uploader(
+            "⬆️ Carica file Backup JSON da ripristinare",
+            type=["json"],
+            key="uploader_backup_json"
+        )
+        if file_backup_up is not None:
+            try:
+                contenuto_json = json.loads(file_backup_up.getvalue().decode("utf-8"))
+                if st.button("✅ Ripristina Dati da File JSON", type="primary", use_container_width=True):
+                    ok, msg = applica_payload_database(contenuto_json)
                     if ok:
-                        st.session_state["admin_notice"] = msg
+                        st.success(msg)
                         st.rerun()
                     else:
                         st.error(msg)
-                except json.JSONDecodeError:
-                    st.error("File JSON non valido o danneggiato.")
-                except Exception as e:
-                    st.error(f"Errore durante l'importazione: {e}")
-
-    st.divider()
-    st.subheader("📊 Registro Accessi dalla Home")
-    opzioni_reg = ottieni_opzioni_accesso_home(db_giocatori)
-    stats_reg = st.session_state.get("statistiche_accessi", {})
-    righe_reg = []
-    for u_nome in opzioni_reg:
-        rec = stats_reg.get(u_nome, {})
-        righe_reg.append({
-            "Utente": u_nome,
-            "Accessi": int(rec.get("count", 0)),
-            "Ultimo Accesso": rec.get("ultimo_accesso") or "Mai",
-        })
-    for u_extra, rec in stats_reg.items():
-        if u_extra not in opzioni_reg:
-            righe_reg.append({
-                "Utente": u_extra,
-                "Accessi": int(rec.get("count", 0)),
-                "Ultimo Accesso": rec.get("ultimo_accesso") or "Mai",
-            })
-    if righe_reg:
-        st.table(pd.DataFrame(righe_reg).sort_values(by=["Accessi", "Utente"], ascending=[False, True]))
+            except Exception as e:
+                st.error(f"File JSON non valido: {e}")
