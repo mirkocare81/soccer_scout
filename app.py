@@ -183,6 +183,7 @@ TUTTE_LE_SCHEDE_APP = [
     "🧲 Lavagna Tattica",
     "⚡ Inserimento Parametri & Voti",
     "🎥 Video Analisi",
+    "🎬 Altri Video",
     "📈 Riepilogo Squadra",
     "⚖️ Confronto Giocatori",
     "📊 Grafici & Analisi Visiva",
@@ -525,6 +526,8 @@ def costruisci_payload_database():
         "auth_config": st.session_state.get("auth_config", {}),
         "statistiche_accessi": st.session_state.get("statistiche_accessi", {}),
         "ultimo_utente_home": st.session_state.get("ultimo_utente_home", ""),
+        "categorie_video": st.session_state.get("categorie_video", ["Allenamenti", "Clip Tattiche", "Motivazione"]),
+        "altri_video": st.session_state.get("altri_video", []),
     }
 
 def applica_payload_database(payload):
@@ -556,6 +559,7 @@ def applica_payload_database(payload):
         cfg_imp.setdefault("sezioni_ragazzi", [
             "🧲 Lavagna Tattica",
             "🎥 Video Analisi",
+            "🎬 Altri Video",
             "📈 Riepilogo Squadra",
             "⚖️ Confronto Giocatori",
             "📊 Grafici & Analisi Visiva",
@@ -570,6 +574,11 @@ def applica_payload_database(payload):
 
     if "ultimo_utente_home" in payload:
         st.session_state["ultimo_utente_home"] = str(payload.get("ultimo_utente_home") or "")
+
+    if isinstance(payload.get("categorie_video"), list) and payload["categorie_video"]:
+        st.session_state["categorie_video"] = [str(c).strip() for c in payload["categorie_video"] if str(c).strip()]
+    if isinstance(payload.get("altri_video"), list):
+        st.session_state["altri_video"] = payload["altri_video"]
 
     salva_dati_su_disco()
     return True, f"Backup importato: {len(giocatori_imp)} giocatori e {len(partite_imp)} partite ripristinati."
@@ -699,6 +708,7 @@ def inizializza_sicurezza_ruoli(dati_salvati):
             "sezioni_ragazzi": cfg_salvata.get("sezioni_ragazzi") or [
                 "🧲 Lavagna Tattica",
                 "🎥 Video Analisi",
+                "🎬 Altri Video",
                 "📈 Riepilogo Squadra",
                 "⚖️ Confronto Giocatori",
                 "📊 Grafici & Analisi Visiva",
@@ -820,6 +830,17 @@ if "ultimo_utente_home" not in st.session_state:
     st.session_state["ultimo_utente_home"] = (
         dati_salvati.get("ultimo_utente_home", "") if isinstance(dati_salvati, dict) else ""
     )
+
+if "categorie_video" not in st.session_state:
+    cats_init = dati_salvati.get("categorie_video") if isinstance(dati_salvati, dict) else None
+    if isinstance(cats_init, list) and cats_init:
+        st.session_state["categorie_video"] = [str(c).strip() for c in cats_init if str(c).strip()]
+    else:
+        st.session_state["categorie_video"] = ["Allenamenti", "Clip Tattiche", "Motivazione"]
+
+if "altri_video" not in st.session_state:
+    vids_init = dati_salvati.get("altri_video") if isinstance(dati_salvati, dict) else None
+    st.session_state["altri_video"] = vids_init if isinstance(vids_init, list) else []
 
 if "utente_attivo" not in st.session_state:
     st.session_state["utente_attivo"] = ""
@@ -1121,7 +1142,7 @@ if not st.session_state["home_entered"]:
         st.markdown(
             "<div class='scoutai-home-banner'>"
             "<div class='scoutai-home-kicker'>ScoutAI · Match Analysis</div>"
-            "<h1 class='scoutai-home-title'>Benvenuti nell'app ufficiale dell'USO NUVOLENTO - 2011</h1>"
+            "<h1 class='scoutai-home-title'>Benvenuti nella fortezza dei dati dell'USO NUVOLENTO - 2011</h1>"
             "</div>",
             unsafe_allow_html=True,
         )
@@ -1717,6 +1738,7 @@ with st.sidebar:
                 if s in [
                     "🧲 Lavagna Tattica",
                     "🎥 Video Analisi",
+                    "🎬 Altri Video",
                     "📈 Riepilogo Squadra",
                     "⚖️ Confronto Giocatori",
                     "📊 Grafici & Analisi Visiva",
@@ -2551,6 +2573,136 @@ elif menu == "🎥 Video Analisi":
                 <p style="color: #718096; margin-top: 6px; font-size: 13px;">{"Incolla un link YouTube qui sopra e clicca su <strong>Carica Video</strong>." if not lettura_only else "Il video per questa partita non è ancora stato caricato."}</p>
             </div>
         """, unsafe_allow_html=True)
+
+# =====================================================================
+# 4B. ALTRI VIDEO (NON LEGATI A PARTITE, RAGGRUPPABILI PER CATEGORIA)
+# =====================================================================
+elif menu == "🎬 Altri Video":
+    st.title("🎬 Altri Video")
+    st.caption("Raccolta di video YouTube extra (non legati a singole partite), organizzati per categoria e con anteprima rapida.")
+    lettura_only = is_sola_lettura()
+
+    categorie_disp = st.session_state.get("categorie_video") or ["Generale"]
+    altri_video_lista = st.session_state.get("altri_video") or []
+
+    if not lettura_only:
+        with st.expander("➕ Aggiungi Nuovo Video YouTube", expanded=len(altri_video_lista) == 0):
+            with st.form("form_aggiungi_altro_video"):
+                c_tit, c_cat = st.columns([1.4, 1.0])
+                with c_tit:
+                    v_titolo = st.text_input("Titolo Video", placeholder="Es. Circuito pressing alto / Highlights")
+                with c_cat:
+                    v_cat = st.selectbox("Categoria", options=categorie_disp, index=0)
+                v_url = st.text_input("Link YouTube", placeholder="https://www.youtube.com/watch?v=...")
+                v_desc = st.text_input("Nota breve (opzionale)", placeholder="Es. Minuto 12:00 interessante per i terzini")
+                if st.form_submit_button("💾 Salva Video", use_container_width=True):
+                    yt_id_new = estrai_youtube_id((v_url or "").strip())
+                    if not (v_titolo or "").strip():
+                        st.error("Inserisci un titolo per il video.")
+                    elif not yt_id_new:
+                        st.error("Inserisci un link YouTube valido.")
+                    else:
+                        nuovo_vid = {
+                            "id": f"vid_{int(time.time() * 1000)}_{len(altri_video_lista)}",
+                            "titolo": v_titolo.strip(),
+                            "categoria": v_cat,
+                            "url": v_url.strip(),
+                            "yt_id": yt_id_new,
+                            "nota": (v_desc or "").strip(),
+                        }
+                        altri_video_lista.append(nuovo_vid)
+                        st.session_state["altri_video"] = altri_video_lista
+                        salva_dati_su_disco()
+                        st.success(f"Video '{nuovo_vid['titolo']}' aggiunto in '{v_cat}'!")
+                        st.rerun()
+
+    st.divider()
+
+    filtro_cat = st.selectbox(
+        "Filtra per Categoria",
+        options=["Tutte le categorie"] + categorie_disp,
+        key="filtro_cat_altri_video"
+    )
+
+    if "video_in_riproduzione_id" not in st.session_state:
+        st.session_state["video_in_riproduzione_id"] = None
+
+    video_filtrati = [
+        v for v in altri_video_lista
+        if filtro_cat == "Tutte le categorie" or v.get("categoria") == filtro_cat
+    ]
+
+    if not video_filtrati:
+        st.info("Nessun video presente per il filtro selezionato.")
+    else:
+        vid_attivo = next(
+            (v for v in video_filtrati if v.get("id") == st.session_state.get("video_in_riproduzione_id")),
+            None
+        )
+        if vid_attivo:
+            yt_act = vid_attivo.get("yt_id") or estrai_youtube_id(vid_attivo.get("url", ""))
+            st.markdown(f"### ▶️ In riproduzione: {vid_attivo.get('titolo', 'Video')}")
+            st.caption(f"Categoria: **{vid_attivo.get('categoria', 'Generale')}**" + (f" · {vid_attivo.get('nota')}" if vid_attivo.get("nota") else ""))
+            if yt_act:
+                components.html(
+                    f"""
+                    <div style="position:relative;width:100%;padding-bottom:56.25%;height:0;border-radius:{radius_px}px;overflow:hidden;border:1px solid {accent_hex};">
+                        <iframe src="https://www.youtube.com/embed/{yt_act}?autoplay=1"
+                            style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowfullscreen></iframe>
+                    </div>
+                    """,
+                    height=440,
+                    scrolling=False,
+                )
+            if st.button("✖️ Chiudi anteprima grande", key="btn_chiudi_player_extra"):
+                st.session_state["video_in_riproduzione_id"] = None
+                st.rerun()
+            st.divider()
+
+        categorie_da_mostrare = [filtro_cat] if filtro_cat != "Tutte le categorie" else list(categorie_disp)
+        altre_cat_presenti = [
+            v.get("categoria") or "Generale"
+            for v in video_filtrati
+            if (v.get("categoria") or "Generale") not in categorie_da_mostrare
+        ]
+        for c_ext in altre_cat_presenti:
+            if c_ext not in categorie_da_mostrare:
+                categorie_da_mostrare.append(c_ext)
+
+        for cat_nome in categorie_da_mostrare:
+            vids_cat = [v for v in video_filtrati if (v.get("categoria") or "Generale") == cat_nome]
+            if not vids_cat:
+                continue
+            st.markdown(f"### 📁 {cat_nome} ({len(vids_cat)})")
+            cols_grid = st.columns(3)
+            for idx_v, vid in enumerate(vids_cat):
+                with cols_grid[idx_v % 3]:
+                    yt_v = vid.get("yt_id") or estrai_youtube_id(vid.get("url", ""))
+                    thumb_url = f"https://img.youtube.com/vi/{yt_v}/hqdefault.jpg" if yt_v else ""
+                    vid_id = vid.get("id", f"{cat_nome}_{idx_v}")
+                    st.markdown(f"""
+                    <div class="scoutai-box" style="padding:12px; margin-bottom:10px;">
+                        <img src="{thumb_url}" alt="{vid.get('titolo', 'Anteprima')}" style="width:100%; aspect-ratio:16/9; object-fit:cover; border-radius:{max(6, radius_px-4)}px; margin-bottom:8px; display:block;" />
+                        <div style="font-weight:700; font-size:15px; margin-bottom:4px;">{vid.get('titolo', 'Video')}</div>
+                        <div style="font-size:12px; color:#94a3b8; margin-bottom:6px;">{vid.get('nota') or '&nbsp;'}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    b_play, b_del = st.columns([2, 1] if not lettura_only else [1, 0.01])
+                    with b_play:
+                        if st.button("▶️ Apri", key=f"play_extra_{vid_id}_{idx_v}", use_container_width=True):
+                            st.session_state["video_in_riproduzione_id"] = vid_id
+                            st.rerun()
+                    if not lettura_only:
+                        with b_del:
+                            if st.button("🗑️", key=f"del_extra_{vid_id}_{idx_v}", use_container_width=True):
+                                nuovi_vids = [x for x in altri_video_lista if x.get("id") != vid_id]
+                                st.session_state["altri_video"] = nuovi_vids
+                                if st.session_state.get("video_in_riproduzione_id") == vid_id:
+                                    st.session_state["video_in_riproduzione_id"] = None
+                                salva_dati_su_disco()
+                                st.rerun()
 
 # =====================================================================
 # 5. RIEPILOGO SQUADRA & GIOCATORI
@@ -4027,3 +4179,42 @@ elif menu == "🛡️ Pannello Admin":
             salva_dati_su_disco()
             st.success("Tutti i contatori accessi sono stati resettati!")
             st.rerun()
+
+    st.divider()
+    st.subheader("🎬 Categorie per 'Altri Video'")
+    st.caption("Definisci le categorie con cui raggruppare i video extra non legati a partite.")
+
+    cats_attuali = st.session_state.get("categorie_video") or ["Allenamenti", "Clip Tattiche", "Motivazione"]
+    st.write("**Categorie attuali:** " + (", ".join(f"`{c}`" for c in cats_attuali)))
+
+    c_add_cat, c_del_cat = st.columns(2)
+    with c_add_cat:
+        nuova_cat_nome = st.text_input("Nuova categoria video", placeholder="Es. Palle inattive", key="input_nuova_cat_video")
+        if st.button("➕ Aggiungi Categoria", use_container_width=True, key="btn_add_cat_video"):
+            nome_pulito = (nuova_cat_nome or "").strip()
+            if not nome_pulito:
+                st.warning("Inserisci il nome della categoria.")
+            elif nome_pulito in cats_attuali:
+                st.info("Questa categoria esiste già.")
+            else:
+                cats_attuali.append(nome_pulito)
+                st.session_state["categorie_video"] = cats_attuali
+                salva_dati_su_disco()
+                st.success(f"Categoria '{nome_pulito}' aggiunta!")
+                st.rerun()
+
+    with c_del_cat:
+        cat_da_rim = st.selectbox("Categoria da rimuovere", options=cats_attuali, key="sel_del_cat_video")
+        if st.button("🗑️ Rimuovi Categoria", use_container_width=True, key="btn_del_cat_video"):
+            if len(cats_attuali) <= 1:
+                st.warning("Deve restare almeno una categoria.")
+            else:
+                cats_rimaste = [c for c in cats_attuali if c != cat_da_rim]
+                cat_fallback = cats_rimaste[0]
+                for v_item in st.session_state.get("altri_video", []):
+                    if v_item.get("categoria") == cat_da_rim:
+                        v_item["categoria"] = cat_fallback
+                st.session_state["categorie_video"] = cats_rimaste
+                salva_dati_su_disco()
+                st.success(f"Categoria '{cat_da_rim}' rimossa (video spostati su '{cat_fallback}').")
+                st.rerun()
